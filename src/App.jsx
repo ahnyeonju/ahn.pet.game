@@ -231,6 +231,8 @@ const placementBounds = (category) => PLACEMENT_BOUNDS[category] || PLACEMENT_BO
 // 방에 배치되는 오브젝트(데코) 크기는 절대 px이 아니라, 에셋 원본 px을 이 기준 폭으로 나눈
 // 비율(PPU=1)을 실제 컨테이너 폭에 곱해 정한다. → 기기마다 화면 폭 대비 동일 비율, 종횡비 유지.
 const REFERENCE_RESOLUTION = { width: 1080, height: 2340 }; // 9:19.5 FHD+
+// 펫 디자인 폭(기준 1080 기준 px). 데코와 동일 공식으로 크기 산출 → 데코·배경과 비율 고정.
+const PET_REF_WIDTH = 320;
 
 // 펫이 바닥에 서 있는 기준선 (% from top). 데코의 발(바닥 접점)이 이 값보다 아래면
 // 데코가 펫 앞으로, 위면 펫이 데코 앞으로 렌더된다 (2.5D Y-정렬).
@@ -613,6 +615,9 @@ export default function App() {
   const getPetEmoji = () => pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.emoji||"✨" : pet.stage===2?"🐣":"🥚";
   const getPetName  = () => pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.name||"최종체" : pet.stage===2?"성장체":"아기 펫";
   const getPetImg   = () => { if(pet.stage===3&&pet.finalForm) return `/images/pets/stage3/${pet.finalForm}.png`; if(pet.stage===2) return "/images/pets/stage2/growth.png"; return `/images/pets/stage1/${egg||"default"}.png`; };
+  // 모션 에셋 경로 — 폼별 파이프라인. 현재 전 폼 미보유 → 공용 _test 사용(v1).
+  // TODO(per-form): 폼별 에셋 생기면 stage/finalForm 기준 경로 반환하도록 확장.
+  const getPetMotion = () => ({ stand: "/images/pets/_test/stand.webp", walk: "/images/pets/_test/walk.webp" });
 
   const growthMax = pet.stage===1 ? GROWTH_THRESHOLDS.stage2 : GROWTH_THRESHOLDS.stage3;
   const growthPct = Math.min(100,(pet.growthPoint/growthMax)*100);
@@ -631,7 +636,7 @@ export default function App() {
           <HomeLayout
             pet={pet} daily={daily} inv={inv} weather={weather} wm={wm}
             growthPct={growthPct} growthMax={growthMax} missionDone={missionDone}
-            getPetEmoji={getPetEmoji} getPetName={getPetName} getPetImg={getPetImg}
+            getPetEmoji={getPetEmoji} getPetName={getPetName} getPetImg={getPetImg} getPetMotion={getPetMotion}
             canEvolve={canEvolve}
             onFeed={handleFeed} onPlay={handlePlay} onClean={handleClean}
             onGiftNav={()=>setScreen("giftbox")} onStatusCheck={handleStatusCheck}
@@ -738,6 +743,200 @@ function PetSprite({ size, emoji, imgSrc, style = {} }) {
     );
   }
   return <span style={{ fontSize: size, lineHeight: 1, display: "inline-block", ...style }}>{emoji}</span>;
+}
+
+// ===================================================
+// 펫 자율 행동 (보행/드래그/말풍선/연타감정) — POC 이식
+// 수치·대사는 아래 마스터 상수에만. 시각 교체 지점은 MOTIONS(렌더 레이어).
+// ===================================================
+const PET_MOTION_CFG = {
+  speed: 0.4, roamRadius: 110, arrive: 4,
+  walkMin: 4000, walkMax: 7000,
+  idleMin: 3000, idleMax: 8000,
+  longRestEvery: 3, longRestMs: 12000,
+  standAfterDrop: 2000, oneShotMs: 1300, bubbleMs: 1800,
+  tapWindow: 1200, tapsForEmotion: 3, dragThresh: 8,
+  floorTopPct: 0.64, floorBottomPct: 0.97,  // 펫 발이 머무는 마루 밴드(컨테이너 높이 대비)
+};
+const PET_LINES = ["안녕!", "배고파…", "놀자 놀자~", "오늘 기분 좋아", "쓰담쓰담 해줘", "히힝~", "어디 가?"];
+const PET_EMOTIONS = [
+  { motion: "angry", line: "그만 만져!" },
+  { motion: "sad", line: "흑흑…" },
+  { motion: "surprise", line: "꺄악!" },
+  { motion: "smug", line: "흥칫뿡" },
+];
+
+// 모션 에셋 유무를 확인해 wandering / 정적 fallback 결정
+function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji, petName, petColor }) {
+  const [ready, setReady] = useState(null); // null=확인중, true=모션, false=정적fallback
+  useEffect(() => {
+    if (!motion?.stand || !motion?.walk) { setReady(false); return; }
+    let alive = true, loaded = 0;
+    const ok = () => { if (alive && ++loaded === 2) setReady(true); };
+    const fail = () => { if (alive) setReady(false); };
+    const ims = [motion.stand, motion.walk].map(src => {
+      const im = new Image(); im.onload = ok; im.onerror = fail; im.src = src; return im;
+    });
+    return () => { alive = false; ims.forEach(im => { im.onload = im.onerror = null; }); };
+  }, [motion?.stand, motion?.walk]);
+
+  if (ready !== true) {
+    // 정적 fallback — 기존 중앙 고정 펫과 동일 (모션 에셋 없는 폼)
+    return (
+      <div style={{position:"absolute",left:"50%",bottom:"32%",transform:"translateX(-50%)",display:"flex",flexDirection:"column-reverse",alignItems:"center",gap:4,zIndex:Math.round(PET_BASE_Y),pointerEvents:"none",textAlign:"center"}}>
+        <div style={{animation:"float 3s ease-in-out infinite",filter:`drop-shadow(0 8px 24px ${petColor}99)`,userSelect:"none"}}>
+          <PetSprite size={96} emoji={staticEmoji} imgSrc={staticImg}/>
+        </div>
+        <div style={{fontFamily:"'Jua',sans-serif",fontSize:14,color:"#fff",textShadow:"0 2px 10px rgba(0,0,0,.65)",whiteSpace:"nowrap"}}>{petName}</div>
+      </div>
+    );
+  }
+  return <WanderingPetActive containerRef={containerRef} scrollXRef={scrollXRef} motion={motion} petName={petName} petColor={petColor}/>;
+}
+
+function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColor }) {
+  const wrapRef = useRef(null), imgRef = useRef(null), bubbleRef = useRef(null), bubbleTextRef = useRef(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const wrap = wrapRef.current, img = imgRef.current, bubble = bubbleRef.current, bubbleText = bubbleTextRef.current;
+    if (!container || !wrap || !img) return;
+
+    const C = PET_MOTION_CFG;
+    const MOTIONS = { stand: motion.stand, walk: motion.walk };  // 키→src. 없는 키(감정)는 stand로
+    const STATE_MOTION = { idle: "stand", walk: "walk", grabbed: "stand" };
+    const now = () => performance.now();
+
+    let W = 0, H = 0, floorTop = 0, floorBottom = 0, petSize = 0;
+    const pet = { x: 0, y: 0, facing: 1, state: "idle", oneShotMotion: null };
+    let home = { x: 0, y: 0 }, target = null;
+    let walkUntil = 0, walkCount = 0, idleUntil = 0, motionUntil = 0, bubbleUntil = 0, curSrc = "";
+
+    function resize() {
+      W = container.clientWidth; H = container.clientHeight;
+      floorTop = H * C.floorTopPct; floorBottom = H * C.floorBottomPct;
+      petSize = Math.round((PET_REF_WIDTH / REFERENCE_RESOLUTION.width) * W); // 데코와 동일 공식
+      wrap.style.width = petSize + "px"; wrap.style.height = petSize + "px";
+    }
+    function clampFloor(x, y) {  // x=월드 좌표(방 폭 3W), 발(중심+half)이 마루 밴드 안에 머물도록
+      const half = petSize / 2;
+      return {
+        x: Math.max(half, Math.min(3 * W - half, x)),
+        y: Math.max(floorTop - half, Math.min(floorBottom - half, y)),
+      };
+    }
+    function roamPoint() {
+      const r = Math.random() * C.roamRadius, a = Math.random() * Math.PI * 2;
+      return clampFloor(home.x + Math.cos(a) * r, home.y + Math.sin(a) * r);
+    }
+    function pickTarget() {
+      walkUntil = now() + C.walkMin + Math.random() * (C.walkMax - C.walkMin);
+      target = roamPoint(); pet.state = "walk";
+    }
+    function moveToward() {
+      const dx = target.x - pet.x, dy = target.y - pet.y, d = Math.hypot(dx, dy);
+      if (d <= C.arrive) {
+        if (now() < walkUntil) { target = roamPoint(); return; } // 걷기 시간 남음 → 이어 잡기
+        target = null; pet.state = "idle"; walkCount++;
+        idleUntil = now() + (walkCount % C.longRestEvery === 0
+          ? C.longRestMs : C.idleMin + Math.random() * (C.idleMax - C.idleMin));
+        return;
+      }
+      pet.x += (dx / d) * C.speed; pet.y += (dy / d) * C.speed;
+      if (Math.abs(dx) > 0.5) pet.facing = dx > 0 ? 1 : -1;
+    }
+    function showBubble(text) { bubbleText.textContent = text; bubbleUntil = now() + C.bubbleMs; }
+    function playOneShot(key) { pet.oneShotMotion = key; pet.state = "oneshot"; motionUntil = now() + C.oneShotMs; target = null; }
+    function triggerEmotion() {
+      const e = PET_EMOTIONS[Math.floor(Math.random() * PET_EMOTIONS.length)];
+      playOneShot(e.motion); showBubble(e.line);
+    }
+
+    function render() {
+      const key = pet.state === "oneshot" ? pet.oneShotMotion : (STATE_MOTION[pet.state] || "stand");
+      const src = MOTIONS[key] || MOTIONS.stand;  // 감정 등 자산 없는 키 → stand
+      if (src !== curSrc) { img.src = src; curSrc = src; }  // 바뀔 때만(애니 리셋 방지)
+      wrap.style.transform = `translate(${pet.x - scrollXRef.current - petSize / 2}px, ${pet.y - petSize / 2}px)`;  // 월드→화면: scrollX만큼 밀림(배경에 박힘)
+      img.style.transform = `scaleX(${pet.facing})`;
+      const footPct = ((pet.y + petSize / 2) / H) * 100;  // 동적 Y-정렬(데코와 동일 스케일)
+      wrap.style.zIndex = String(Math.round(Math.min(150, Math.max(1, footPct))));
+      bubble.style.opacity = (now() < bubbleUntil && pet.state !== "grabbed") ? "1" : "0";
+    }
+
+    let rafId = 0;
+    function tick() {
+      const t = now();
+      switch (pet.state) {
+        case "grabbed": break;
+        case "oneshot": if (t >= motionUntil) { pet.state = "idle"; idleUntil = t + 400; } break;
+        case "walk": if (target) moveToward(); else pet.state = "idle"; break;
+        default: if (t >= idleUntil) pickTarget();
+      }
+      render();
+      rafId = requestAnimationFrame(tick);
+    }
+
+    // ── 입력: 탭=대사/감정, 길게 끌기=잡아서 옮기기(월드 좌표). 펫 위 조작은 배경 스크롤로 안 샘 ──
+    let down = null, lastTap = 0, tapCount = 0;
+    function handleTap() {
+      const t = now();
+      tapCount = (t - lastTap < C.tapWindow) ? tapCount + 1 : 1; lastTap = t;
+      if (tapCount >= C.tapsForEmotion) { tapCount = 0; triggerEmotion(); }
+      else {
+        showBubble(PET_LINES[Math.floor(Math.random() * PET_LINES.length)]);
+        if (pet.state === "walk") { target = null; pet.state = "idle"; }
+        idleUntil = t + 700;
+      }
+    }
+    function worldXY(e) {  // 화면 좌표 → 월드(방) 좌표
+      const r = container.getBoundingClientRect();
+      return clampFloor((e.clientX - r.left) + scrollXRef.current, e.clientY - r.top);
+    }
+    function onDown(e) { e.preventDefault(); wrap.setPointerCapture?.(e.pointerId); down = { x: e.clientX, y: e.clientY, dragging: false }; }
+    function onMove(e) {
+      if (!down) return;
+      if (!down.dragging && Math.hypot(e.clientX - down.x, e.clientY - down.y) > C.dragThresh) { down.dragging = true; pet.state = "grabbed"; target = null; }
+      if (down.dragging) { const p = worldXY(e); pet.x = p.x; pet.y = p.y; }
+    }
+    function onUp() {
+      if (!down) return;
+      if (down.dragging) { home = { x: pet.x, y: pet.y }; pet.state = "idle"; idleUntil = now() + C.standAfterDrop; } // 내려놓은 자리 = 새 활동중심
+      else handleTap();
+      down = null;
+    }
+    wrap.addEventListener("pointerdown", onDown);
+    wrap.addEventListener("pointermove", onMove);
+    wrap.addEventListener("pointerup", onUp);
+    wrap.addEventListener("pointercancel", onUp);
+    window.addEventListener("resize", resize);
+
+    resize();
+    home = clampFloor((scrollXRef?.current || 0) + W / 2, H * 0.78);  // 초기 활동 중심 = 현재 보이는 방 중앙(월드)
+    pet.x = home.x; pet.y = home.y;
+    idleUntil = now() + 500;
+    rafId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", resize);
+      wrap.removeEventListener("pointerdown", onDown);
+      wrap.removeEventListener("pointermove", onMove);
+      wrap.removeEventListener("pointerup", onUp);
+      wrap.removeEventListener("pointercancel", onUp);
+    };
+  }, [containerRef, motion.stand, motion.walk]);
+
+  return (
+    <div ref={wrapRef} data-pet style={{ position:"absolute", left:0, top:0, touchAction:"none", cursor:"grab", userSelect:"none", WebkitUserSelect:"none", willChange:"transform" }}>
+      <img ref={imgRef} alt="" draggable={false}
+        style={{ width:"100%", height:"100%", objectFit:"contain", display:"block", pointerEvents:"none", filter:`drop-shadow(0 6px 16px ${petColor}88)` }}/>
+      <div ref={bubbleRef} style={{ position:"absolute", left:"50%", bottom:"104%", transform:"translateX(-50%)", background:"#fff", border:"2px solid #333", borderRadius:12, padding:"5px 10px", fontSize:12, fontWeight:800, color:"#222", whiteSpace:"nowrap", opacity:0, transition:"opacity .12s", pointerEvents:"none", fontFamily:"'Jua',sans-serif" }}>
+        <span ref={bubbleTextRef}></span>
+        <span style={{ position:"absolute", left:"50%", bottom:-7, transform:"translateX(-50%)", width:0, height:0, borderLeft:"6px solid transparent", borderRight:"6px solid transparent", borderTop:"7px solid #333" }}/>
+      </div>
+      <div style={{ position:"absolute", left:"50%", top:"102%", transform:"translateX(-50%)", fontFamily:"'Jua',sans-serif", fontSize:13, color:"#fff", textShadow:"0 2px 10px rgba(0,0,0,.65)", whiteSpace:"nowrap", pointerEvents:"none" }}>{petName}</div>
+    </div>
+  );
 }
 
 // ===================================================
@@ -886,7 +1085,7 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, onFixTogg
 
 function HomeLayout({
   pet, daily, inv, weather, wm, growthPct, growthMax, missionDone,
-  getPetEmoji, getPetName, getPetImg, canEvolve,
+  getPetEmoji, getPetName, getPetImg, getPetMotion, canEvolve,
   onFeed, onPlay, onClean, onGiftNav, onStatusCheck, onNav, onShare, onSettings, onEventClaim,
   onDecorSave,
 }) {
@@ -954,10 +1153,13 @@ function HomeLayout({
     : SHOP_MASTER.filter(i => DECOR_CATEGORIES.includes(i.category) && inv.shopItems?.[i.id]?.equipped);
 
   const [scrollX, setScrollX] = useState(0);
+  const scrollXRef = useRef(0);  // rAF(펫)에서 실시간 scrollX 읽기용
+  useEffect(() => { scrollXRef.current = scrollX; }, [scrollX]);
   const bgDragRef = useRef({ active:false, startX:0, startScroll:0 });
   const midRef    = useRef(null);
 
   const onTouchStart = (e) => {
+    if (e.target.closest?.("[data-pet]")) return;  // 펫 위 조작은 펫이 처리 (배경 스크롤 억제)
     bgDragRef.current = { active:true, startX:e.touches[0].clientX, startScroll:scrollX };
   };
   const onTouchMove = (e) => {
@@ -967,6 +1169,18 @@ function HomeLayout({
     setScrollX(Math.max(0, Math.min(w*2, bgDragRef.current.startScroll + delta)));
   };
   const onTouchEnd = () => { bgDragRef.current.active = false; };
+
+  // 배경(가로 3배) 중앙에서 시작 → 좌우 양방향 스크롤 가능
+  useEffect(() => {
+    let raf;
+    const center = () => {
+      const w = midRef.current?.offsetWidth || 0;
+      if (w) setScrollX(w);                     // 중앙(가운데 1/3) 표시
+      else raf = requestAnimationFrame(center); // 아직 레이아웃 전이면 다음 프레임 재시도
+    };
+    center();
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, []);
 
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",position:"relative",overflow:"hidden"}}>
@@ -1037,20 +1251,18 @@ function HomeLayout({
           </div>
         )}
 
-        {/* 펫 */}
-        <div style={{
-          position:"absolute", left:"50%", bottom:"32%",
-          transform:"translateX(-50%)",
-          display:"flex", flexDirection:"column-reverse", alignItems:"center",
-          gap:4, zIndex:Math.round(PET_BASE_Y), pointerEvents:"none", textAlign:"center",
-        }}>
-          <div style={{animation:"float 3s ease-in-out infinite",filter:`drop-shadow(0 8px 24px ${petColor}99)`,userSelect:"none"}}>
-            <PetSprite size={96} emoji={getPetEmoji()} imgSrc={getPetImg()}/>
-          </div>
-          <div style={{fontFamily:"'Jua',sans-serif",fontSize:14,color:"#fff",textShadow:"0 2px 10px rgba(0,0,0,.65)",whiteSpace:"nowrap"}}>
-            {getPetName()}
-          </div>
-        </div>
+        {/* 펫 — 자율 행동 (보행·드래그·말풍선). 꾸미기 모드에선 숨김 */}
+        {!isDecorMode && (
+          <WanderingPet
+            containerRef={midRef}
+            scrollXRef={scrollXRef}
+            motion={getPetMotion()}
+            staticImg={getPetImg()}
+            staticEmoji={getPetEmoji()}
+            petName={getPetName()}
+            petColor={petColor}
+          />
+        )}
 
         {/* 좌측 패널 */}
         {!isDecorMode && (
