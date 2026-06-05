@@ -227,6 +227,17 @@ const PLACEMENT_BOUNDS = {
 };
 const placementBounds = (category) => PLACEMENT_BOUNDS[category] || PLACEMENT_BOUNDS.decoration;
 
+// 기준 해상도 — 유니티 Canvas Scaler의 Reference Resolution 개념.
+// 방에 배치되는 오브젝트(데코) 크기는 절대 px이 아니라, 에셋 원본 px을 이 기준 폭으로 나눈
+// 비율(PPU=1)을 실제 컨테이너 폭에 곱해 정한다. → 기기마다 화면 폭 대비 동일 비율, 종횡비 유지.
+const REFERENCE_RESOLUTION = { width: 1080, height: 2340 }; // 9:19.5 FHD+
+
+// 펫이 바닥에 서 있는 기준선 (% from top). 데코의 발(바닥 접점)이 이 값보다 아래면
+// 데코가 펫 앞으로, 위면 펫이 데코 앞으로 렌더된다 (2.5D Y-정렬).
+const PET_BASE_Y = 65;
+// z-index 밴드: 게임 오브젝트(배경·펫·데코)는 0~150에서 바닥선 기준 정렬, UI는 그 위.
+const Z_UI = { panel: 200, evoBubble: 250, decorCtrl: 300 };
+
 const MISSION_REWARDS  = {
   feed:        { growth: 5,  statusKey: "hunger",    statusGain: 30 },
   clean:       { growth: 4,  statusKey: "cleanness", statusGain: 30 },
@@ -766,6 +777,26 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, onFixTogg
 
   useEffect(() => { setLocalPos(itemState.position); }, [itemState.position]);
 
+  // 기준 해상도 비율 기반 크기 — 원본 px ÷ 기준 폭 × 실제 컨테이너 폭 × scale
+  const [natural, setNatural] = useState(null);   // 에셋 원본 px {w,h}
+  const [box, setBox]         = useState({ w:0, h:0 }); // 컨테이너(화면) px
+  const [imgFailed, setImgFailed] = useState(false);
+  useEffect(() => { setImgFailed(false); }, [item.imagePath]);
+  useEffect(() => {
+    const measure = () => setBox({ w: containerRef.current?.offsetWidth || 0, h: containerRef.current?.offsetHeight || 0 });
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [containerRef]);
+  const dispW = (natural && box.w)
+    ? (natural.w / REFERENCE_RESOLUTION.width) * box.w * (item.scale ?? 1)
+    : null;
+
+  // 바닥 접점(발) y = 중심 y + 스프라이트 절반 높이(컨테이너 높이 대비 %). Y-정렬 키로 사용.
+  const dispH    = (dispW && natural) ? dispW * (natural.h / natural.w) : 0;
+  const baseY    = (dispH && box.h) ? localPos.y + (dispH / 2) / box.h * 100 : localPos.y;
+  const depthZ   = Math.round(Math.min(150, Math.max(1, baseY)));
+
   const handleTouchStart = (e) => {
     if (!draggable || itemState.isFixed) return;
     e.stopPropagation();
@@ -804,14 +835,23 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, onFixTogg
       onTouchEnd={draggable ? handleTouchEnd : undefined}
       style={{
         position:"absolute", left:`calc(${localPos.x}% - ${scrollX}px)`, top:`${localPos.y}%`,
-        transform:"translate(-50%,-50%)", zIndex:15,
+        transform:"translate(-50%,-50%)", zIndex:depthZ,
         touchAction: (draggable && !fixed) ? "none" : "auto",
         userSelect:"none",
         pointerEvents: draggable ? "auto" : "none",
       }}
     >
       <div style={{position:"relative"}}>
-        <ShopItemImage item={item} size={60}/>
+        {item.imagePath && !imgFailed ? (
+          <img src={item.imagePath} alt="" draggable={false}
+            onError={() => setImgFailed(true)}
+            onLoad={e => setNatural({ w:e.target.naturalWidth, h:e.target.naturalHeight })}
+            style={{ width: dispW ?? 60, height:"auto", display:"block", pointerEvents:"none" }}/>
+        ) : (
+          <span style={{ fontSize: Math.round((dispW ?? 60) * 0.62), lineHeight:1 }}>
+            {CATEGORY_FALLBACK[item.category] || "🛍️"}
+          </span>
+        )}
 
         {/* 꾸미기 모드에서만 조작 버튼 표시 */}
         {draggable && (
@@ -965,7 +1005,7 @@ function HomeLayout({
 
         {/* 꾸미기 모드 — 상단 완료/취소 바 */}
         {isDecorMode && (
-          <div style={{position:"absolute",top:0,left:0,right:0,zIndex:30,
+          <div style={{position:"absolute",top:0,left:0,right:0,zIndex:Z_UI.decorCtrl,
             display:"flex",justifyContent:"space-between",alignItems:"center",
             padding:"10px 14px",background:"rgba(0,0,0,.35)",backdropFilter:"blur(6px)"}}>
             <button onClick={cancelDecor}
@@ -988,7 +1028,7 @@ function HomeLayout({
         {!isDecorMode && canEvolve && !evoBubbleDismissed && (
           <div
             onClick={() => { setEvoBubbleDismissed(true); onStatusCheck(); }}
-            style={{position:"absolute",top:10,left:12,zIndex:20,cursor:"pointer",animation:"pop .35s ease"}}
+            style={{position:"absolute",top:10,left:12,zIndex:Z_UI.evoBubble,cursor:"pointer",animation:"pop .35s ease"}}
           >
             <div style={{width:0,height:0,borderLeft:"9px solid transparent",borderRight:"9px solid transparent",borderBottom:"10px solid rgba(255,255,255,.95)",marginLeft:18}}/>
             <div style={{background:"rgba(255,255,255,.95)",borderRadius:14,padding:"9px 14px",boxShadow:"0 4px 20px rgba(0,0,0,.3)",fontSize:13,fontWeight:800,color:"#333",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
@@ -1002,7 +1042,7 @@ function HomeLayout({
           position:"absolute", left:"50%", bottom:"32%",
           transform:"translateX(-50%)",
           display:"flex", flexDirection:"column-reverse", alignItems:"center",
-          gap:4, zIndex:5, pointerEvents:"none", textAlign:"center",
+          gap:4, zIndex:Math.round(PET_BASE_Y), pointerEvents:"none", textAlign:"center",
         }}>
           <div style={{animation:"float 3s ease-in-out infinite",filter:`drop-shadow(0 8px 24px ${petColor}99)`,userSelect:"none"}}>
             <PetSprite size={96} emoji={getPetEmoji()} imgSrc={getPetImg()}/>
@@ -1014,14 +1054,14 @@ function HomeLayout({
 
         {/* 좌측 패널 */}
         {!isDecorMode && (
-          <div style={{position:"absolute",top:0,left:0,bottom:0,width:62,zIndex:10}}>
+          <div style={{position:"absolute",top:0,left:0,bottom:0,width:62,zIndex:Z_UI.panel}}>
             <LeftPanel weather={weather} wm={wm} daily={daily} hasEvent={hasEvent} onNav={onNav} onEventClaim={onEventClaim}/>
           </div>
         )}
 
         {/* 우측 패널 */}
         {!isDecorMode && (
-          <div style={{position:"absolute",top:0,right:0,bottom:0,width:62,zIndex:10}}>
+          <div style={{position:"absolute",top:0,right:0,bottom:0,width:62,zIndex:Z_UI.panel}}>
             <RightPanel inv={inv} pet={pet} onNav={(s) => {
               if (s === "decorate") { enterDecorMode(); return; }
               onNav(s);
@@ -1611,7 +1651,7 @@ function DecorateModePanel({ inv, draftBg, draftDecos, isOpen, onToggle, onBgSel
   );
 
   return (
-    <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:25}}>
+    <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:Z_UI.decorCtrl}}>
       {/* 토글 핸들 */}
       <div onClick={onToggle}
         style={{display:"flex",justifyContent:"center",alignItems:"center",
