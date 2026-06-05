@@ -315,8 +315,8 @@ const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&family=Jua&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;}
-.shell{width:100%;max-width:420px;height:100dvh;max-height:860px;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
-@media(min-width:480px){.shell{border-radius:36px;height:860px;}}
+.shell{width:100%;max-width:420px;height:100dvh;max-height:910px;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
+@media(min-width:480px){.shell{border-radius:36px;height:910px;}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
 @keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
