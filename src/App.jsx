@@ -226,6 +226,8 @@ const PLACEMENT_BOUNDS = {
   window:     { minY: 5, maxY: 45, defY: 25 },
 };
 const placementBounds = (category) => PLACEMENT_BOUNDS[category] || PLACEMENT_BOUNDS.decoration;
+// 데코 가로 배치 범위(%) — 방 전체(가로 3배=300%) 기준. 첫 1/3이 아닌 전 영역에 배치.
+const DECOR_X = { min: 3, max: 297 };
 
 // 기준 해상도 — 유니티 Canvas Scaler의 Reference Resolution 개념.
 // 방에 배치되는 오브젝트(데코) 크기는 절대 px이 아니라, 에셋 원본 px을 이 기준 폭으로 나눈
@@ -1014,7 +1016,7 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, onFixTogg
     const dy = ((t.clientY - dragRef.current.startY) / height) * 100;
     const b = placementBounds(item.category);
     setLocalPos({
-      x: Math.max(5, Math.min(95, dragRef.current.startPos.x + dx)),
+      x: Math.max(DECOR_X.min, Math.min(DECOR_X.max, dragRef.current.startPos.x + dx)),  // 월드 전체(3W)
       y: Math.max(b.minY, Math.min(b.maxY, dragRef.current.startPos.y + dy)),
     });
   };
@@ -1140,7 +1142,9 @@ function HomeLayout({
   const handleDraftAdd = (itemId) => {
     if (draftDecos[itemId]) return; // 이미 배치됨
     const cat = SHOP_MASTER.find(i => i.id === itemId)?.category;
-    setDraftDecos(prev => ({ ...prev, [itemId]: { isFixed: false, position: { x:50, y:placementBounds(cat).defY } } }));
+    const w = midRef.current?.offsetWidth || 0;  // 현재 보이는 화면 중앙(월드 x%)에 생성
+    const x = w ? Math.max(DECOR_X.min, Math.min(DECOR_X.max, ((scrollX + w / 2) / w) * 100)) : 50;
+    setDraftDecos(prev => ({ ...prev, [itemId]: { isFixed: false, position: { x, y:placementBounds(cat).defY } } }));
   };
 
   // 렌더에 사용할 배경/장식품 (꾸미기 모드면 draft, 아니면 실제 inv)
@@ -1195,9 +1199,9 @@ function HomeLayout({
       <div
         ref={midRef}
         style={{flex:1,position:"relative",overflow:"hidden",minHeight:0}}
-        onTouchStart={isDecorMode ? undefined : onTouchStart}
-        onTouchMove={isDecorMode ? undefined : onTouchMove}
-        onTouchEnd={isDecorMode ? undefined : onTouchEnd}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
         <RoomBackground weather={weather} scrollX={scrollX} equippedBg={displayBg}/>
 
