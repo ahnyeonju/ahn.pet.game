@@ -327,7 +327,12 @@ const saveState = s => { try { localStorage.setItem("tama_v2",JSON.stringify(s))
 // CSS
 // ===================================================
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&family=Jua&display=swap');
+/* 폰트 self-host (CDN 의존 제거, 오프라인 보장 — P8 철학). public/fonts/ 의 woff2 사용 */
+@font-face{font-family:'Nunito';font-style:normal;font-weight:500;font-display:swap;src:url('/fonts/nunito-500.woff2') format('woff2');}
+@font-face{font-family:'Nunito';font-style:normal;font-weight:700;font-display:swap;src:url('/fonts/nunito-700.woff2') format('woff2');}
+@font-face{font-family:'Nunito';font-style:normal;font-weight:800;font-display:swap;src:url('/fonts/nunito-800.woff2') format('woff2');}
+@font-face{font-family:'Nunito';font-style:normal;font-weight:900;font-display:swap;src:url('/fonts/nunito-900.woff2') format('woff2');}
+@font-face{font-family:'Jua';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/jua-400.woff2') format('woff2');}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;}
 .shell{width:100%;max-width:420px;height:100dvh;max-height:910px;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
