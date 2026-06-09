@@ -313,8 +313,10 @@ const rollDailyEvent = () => Math.random() <= DAILY_EVENT_CHANCE
 // ===================================================
 // 초기 상태
 // ===================================================
+const PET_NAME_MAX  = 8;                              // 펫 이름 최대 글자수
+const PET_NAME_RE   = /^[가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]+$/; // 한글·영문·숫자만 (특수문자·공백 제외)
 const DEFAULT_PET = {
-  stage: 1, growthPoint: 0,
+  name: "", stage: 1, growthPoint: 0,
   traits: { energetic:0, intelligent:0, affectionate:0, lucky:0, fashionable:0, gluttonous:0 },
   finalForm: null,
   status: { ...INITIAL_STATUS },
@@ -602,9 +604,10 @@ export default function App() {
     }
     setPopup("evolution");
   };
-  const handleEggSelect = id => {
-    setEgg(id); setScreen("home");
-    saveState({ egg:id, pet:DEFAULT_PET, daily:{...DEFAULT_DAILY,date:getTodayStr()}, inv:DEFAULT_INV, ghist:[] });
+  const handleEggSelect = (id, name) => {
+    const newPet = { ...DEFAULT_PET, name };
+    setEgg(id); setPet(newPet); setScreen("home");
+    saveState({ egg:id, pet:newPet, daily:{...DEFAULT_DAILY,date:getTodayStr()}, inv:DEFAULT_INV, ghist:[] });
   };
   const handleShare = () => {
     const text = `내 펫 ${getPetName()}을(를) 키우고 있어요! 🥚 함께 키워볼까요?`;
@@ -634,7 +637,7 @@ export default function App() {
   };
 
   const getPetEmoji = () => pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.emoji||"✨" : pet.stage===2?"🐣":"🥚";
-  const getPetName  = () => pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.name||"최종체" : pet.stage===2?"성장체":"아기 펫";
+  const getPetName  = () => pet.name || (pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.name||`${pet.stage}단계` : `${pet.stage}단계`);
   const getPetImg   = () => { if(pet.stage===3&&pet.finalForm) return `/images/pets/stage3/${pet.finalForm}.png`; if(pet.stage===2) return "/images/pets/stage2/growth.png"; return `/images/pets/stage1/${egg||"default"}.png`; };
   // 모션 에셋 경로 — 폼별 파이프라인. 현재 전 폼 미보유 → 공용 _test 사용(v1).
   // TODO(per-form): 폼별 에셋 생기면 stage/finalForm 기준 경로 반환하도록 확장.
@@ -674,7 +677,7 @@ export default function App() {
         {screen==="shop"     && <Shop inv={inv} onBuy={handleShopBuy} onBack={()=>setScreen("home")}/>}
         {screen==="skill"    && <SkillScreen pet={pet} onBack={()=>setScreen("home")}/>}
 
-        {popup==="status"    && <StatusPopup pet={pet} growthMax={growthMax} canEvolve={canEvolve} onEvolve={handleEvolve} onClose={()=>setPopup(null)}/>}
+        {popup==="status"    && <StatusPopup pet={pet} growthMax={growthMax} canEvolve={canEvolve} onEvolve={handleEvolve} onClose={()=>setPopup(null)} petName={getPetName()} petMotion={getPetMotion()} petEmoji={getPetEmoji()}/>}
         {popup==="event"     && daily.event && <EventPopup event={daily.event} claimed={daily.eventRewardClaimed} onClaim={handleEventReward} onClose={()=>setPopup(null)}/>}
         {popup==="rainbow"   && <RainbowPopup onChoose={handleRainbow} onClose={()=>setPopup(null)}/>}
         {popup==="evolution" && evoData && <EvoPopup data={evoData} onConfirm={handleEvoConfirm}/>}
@@ -963,6 +966,9 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
 // ===================================================
 function EggSelect({ onSelect }) {
   const [hov, setHov] = useState(null);
+  const [name, setName] = useState("");
+  const trimmed = name.trim();
+  const nameValid = trimmed.length >= 1 && trimmed.length <= PET_NAME_MAX && PET_NAME_RE.test(trimmed);
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28,gap:20,animation:"fadeUp .5s ease"}}>
       <div style={{textAlign:"center"}}>
@@ -970,9 +976,14 @@ function EggSelect({ onSelect }) {
         <h1 style={{fontFamily:"'Jua',sans-serif",fontSize:26,color:"#fff",textShadow:"0 2px 12px rgba(0,0,0,.4)",marginBottom:4}}>펫을 선택하세요</h1>
         <p style={{color:"rgba(255,255,255,.7)",fontSize:13}}>어떤 알에서 어떤 펫이 나올지 몰라요!</p>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,width:"100%"}}>
+      <div style={{width:"100%"}}>
+        <input value={name} onChange={e=>setName(e.target.value.slice(0,PET_NAME_MAX))} maxLength={PET_NAME_MAX} placeholder="펫 이름을 지어주세요"
+          style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,.12)",border:`2px solid ${nameValid?"rgba(136,216,176,.7)":"rgba(255,255,255,.25)"}`,borderRadius:16,padding:"12px 14px",fontFamily:"'Jua',sans-serif",fontSize:15,color:"#fff",textAlign:"center",outline:"none"}}/>
+        <p style={{color:"rgba(255,255,255,.45)",fontSize:11,marginTop:6,textAlign:"center"}}>한글·영문·숫자 {PET_NAME_MAX}자 이하 (특수문자·공백 제외)</p>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,width:"100%",opacity:nameValid?1:.4,pointerEvents:nameValid?"auto":"none",transition:"opacity .2s"}}>
         {EGG_OPTIONS.map(e=>(
-          <button key={e.id} onMouseEnter={()=>setHov(e.id)} onMouseLeave={()=>setHov(null)} onClick={()=>onSelect(e.id)}
+          <button key={e.id} onMouseEnter={()=>setHov(e.id)} onMouseLeave={()=>setHov(null)} onClick={()=>onSelect(e.id, trimmed)}
             style={{background:hov===e.id?e.color:"rgba(255,255,255,.15)",border:`2px solid ${hov===e.id?"rgba(0,0,0,.15)":"rgba(255,255,255,.25)"}`,borderRadius:20,padding:"16px 8px",cursor:"pointer",transform:hov===e.id?"scale(1.06)":"scale(1)",transition:"all .2s",backdropFilter:"blur(8px)"}}>
             <div style={{display:"flex",justifyContent:"center",marginBottom:5}}>
               <PetSprite size={38} emoji="🥚" imgSrc={`/images/pets/stage1/${e.id}.png`}/>
@@ -2242,10 +2253,35 @@ function SkillScreen({ pet, onBack }) {
 // ===================================================
 // 팝업: 내 펫 상태 (? 버블 포함)
 // ===================================================
-function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onClose }) {
+function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onClose, petName, petMotion, petEmoji }) {
   const [tipStatus, setTipStatus] = useState(false);
   const [tipTrait,  setTipTrait]  = useState(false);
   const maxTrait = Math.max(...Object.values(pet.traits));
+
+  // 펫 이미지 클릭 반응 — 메인과 동일: 단일 탭=랜덤 대사, 연타(tapsForEmotion회)=감정(대사+모션)
+  // 모션 키→src는 메인 렌더 레이어와 동일하게 petMotion[key] || stand. 감정 webp 들어오면 자동 재생.
+  const resolveMotion = key => petMotion?.[key] || petMotion?.stand;
+  const [bubble, setBubble] = useState(null);
+  const [motionSrc, setMotionSrc] = useState(petMotion?.stand);
+  const [pop, setPop] = useState(false);
+  const tapRef = useRef({ last:0, count:0 });
+  const bubbleTimer = useRef(null), popTimer = useRef(null), motionTimer = useRef(null);
+  useEffect(() => () => { clearTimeout(bubbleTimer.current); clearTimeout(popTimer.current); clearTimeout(motionTimer.current); }, []);
+  const handlePetReact = () => {
+    const t = Date.now(), r = tapRef.current;
+    r.count = (t - r.last < PET_MOTION_CFG.tapWindow) ? r.count + 1 : 1; r.last = t;
+    if (r.count >= PET_MOTION_CFG.tapsForEmotion) {
+      r.count = 0;
+      const e = PET_EMOTIONS[Math.floor(Math.random()*PET_EMOTIONS.length)];
+      setBubble(e.line);
+      setMotionSrc(resolveMotion(e.motion));  // 감정 모션(미보유 키는 stand로) 1회 재생
+      clearTimeout(motionTimer.current); motionTimer.current = setTimeout(() => setMotionSrc(petMotion?.stand), PET_MOTION_CFG.oneShotMs);
+    } else {
+      setBubble(PET_LINES[Math.floor(Math.random()*PET_LINES.length)]);
+    }
+    clearTimeout(bubbleTimer.current); bubbleTimer.current = setTimeout(() => setBubble(null), PET_MOTION_CFG.bubbleMs);
+    setPop(true); clearTimeout(popTimer.current); popTimer.current = setTimeout(() => setPop(false), 240);
+  };
 
   return (
     <Overlay>
@@ -2255,9 +2291,20 @@ function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onClose }) {
           <button onClick={onClose} style={{background:"rgba(255,255,255,.12)",border:"none",borderRadius:14,padding:"5px 11px",color:"#fff",cursor:"pointer",fontWeight:700}}>✕</button>
         </div>
 
+        {/* 펫 stand 모습 + 닉네임 — 클릭 시 메인처럼 랜덤 반응 */}
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:16}}>
+          <div onClick={handlePetReact} style={{position:"relative",cursor:"pointer",transform:pop?"scale(1.08)":"scale(1)",transition:"transform .18s ease",WebkitTapHighlightColor:"transparent"}}>
+            {bubble && (
+              <div style={{position:"absolute",left:"50%",bottom:"104%",transform:"translateX(-50%)",background:"#fff",border:"2px solid #333",borderRadius:12,padding:"5px 10px",fontSize:12,fontWeight:800,color:"#222",whiteSpace:"nowrap",fontFamily:"'Jua',sans-serif",animation:"tooltipIn .2s ease",zIndex:5,pointerEvents:"none"}}>{bubble}</div>
+            )}
+            <PetSprite size={104} imgSrc={motionSrc} emoji={petEmoji}/>
+          </div>
+          <div style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:"#fff",marginTop:6,textShadow:"0 2px 10px rgba(0,0,0,.4)"}}>{petName}</div>
+        </div>
+
         {/* 기본 수치 */}
         <div style={{background:"rgba(255,255,255,.07)",borderRadius:16,padding:"12px 14px",marginBottom:12}}>
-          {[["현재 단계",`${pet.stage}단계 · ${["아기","성장체","최종체"][pet.stage-1]}`],["성장도",`${pet.growthPoint} / ${growthMax}`],["다음 진화까지",pet.stage===3?"최종 진화 완료":`${Math.max(0,growthMax-pet.growthPoint)} 남음`]].map(([l,v])=>(
+          {[["현재 단계",pet.stage===3&&pet.finalForm?`3단계 · ${FINAL_FORMS[pet.finalForm]?.name||"3단계"}`:`${pet.stage}단계`],["성장도",`${pet.growthPoint} / ${growthMax}`],["다음 진화까지",pet.stage===3?"최종 진화 완료":`${Math.max(0,growthMax-pet.growthPoint)} 남음`]].map(([l,v])=>(
             <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"rgba(255,255,255,.7)",marginBottom:6}}>
               <span>{l}</span><span style={{color:"#fff",fontWeight:700}}>{v}</span>
             </div>
