@@ -335,7 +335,7 @@ const CSS = `
 @font-face{font-family:'Jua';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/jua-400.woff2') format('woff2');}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;}
-.shell{width:100%;max-width:420px;height:100dvh;max-height:910px;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
+.shell{width:min(100vw,420px);flex-shrink:0;height:100dvh;max-height:910px;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
 @media(min-width:480px){.shell{border-radius:36px;height:910px;}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
 @keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
@@ -1584,7 +1584,8 @@ function BottomBar({ daily, inv, onFeed, onPlay, onClean, onGiftNav }) {
           style={{flex:1,background:a.done?"rgba(255,255,255,.08)":`${a.color}44`,border:`1.5px solid ${a.done?"rgba(255,255,255,.1)":`${a.color}88`}`,borderRadius:18,padding:"10px 4px",opacity:a.done ? 0.55 : 1}}>
           <span style={{fontSize:26,filter:a.done?"grayscale(1)":"none"}}>{a.emoji}</span>
           <span style={{fontSize:10,fontWeight:800,color:a.done?"rgba(255,255,255,.35)":"#fff"}}>{a.label}</span>
-          {a.done&&<span style={{fontSize:9,color:"#4ECB71",fontWeight:700}}>✓ 완료</span>}
+          {/* 완료 줄을 항상 자리잡아 둠 (안 됐을 땐 숨김) → 완료돼도 바 높이 안 변함 */}
+          <span style={{fontSize:9,color:"#4ECB71",fontWeight:700,visibility:a.done?"visible":"hidden"}}>✓ 완료</span>
         </button>
       ))}
     </div>
@@ -1644,7 +1645,9 @@ function MissionScreen({ daily, onClaim, onBack }) {
   };
 
   return (
-    <div style={{height:"100%",display:"flex",flexDirection:"column",padding:18,animation:"fadeUp .3s ease"}}>
+    <div style={{height:"100%",display:"flex",flexDirection:"column",overflow:"hidden",animation:"fadeUp .3s ease"}}>
+      {/* ── 고정 헤더 영역 (디자인 유지) ── */}
+      <div style={{flexShrink:0,padding:"18px 18px 0"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
         <button onClick={onBack} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:20,padding:"8px 14px",color:"#fff",fontWeight:700,cursor:"pointer"}}>←</button>
         <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:"#fff"}}>📋 오늘의 미션</h2>
@@ -1658,8 +1661,10 @@ function MissionScreen({ daily, onClaim, onBack }) {
       <div style={{background:"rgba(0,0,0,.15)",borderRadius:10,height:8,overflow:"hidden",marginBottom:14}}>
         <div style={{width:`${(done/5)*100}%`,height:"100%",background:"linear-gradient(90deg,#F7971E,#FFD200)",borderRadius:10,transition:"width .5s"}}/>
       </div>
+      </div>{/* ── 고정 헤더 끝 ── */}
 
-      <div style={{display:"flex",flexDirection:"column",gap:8,flex:1}}>
+      {/* ── 스크롤 콘텐츠 (상태 변화 흡수 → 프레임 불변) ── */}
+      <div style={{flex:1,overflowY:"auto",minHeight:0,padding:"0 18px 18px",display:"flex",flexDirection:"column",gap:8}}>
         {missions.map(ms=>{
           const state = getState(ms.key);
           return (
@@ -1753,9 +1758,63 @@ function GachaScreen({ inv, daily, lastDraw, onDraw, onBack }) {
 // ===================================================
 // 선물함
 // ===================================================
+// 선물 이미지 — imagePath 있으면 이미지, 없거나 로드 실패면 이모지 fallback
+function GiftImage({ gift, size = 100 }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [gift?.imagePath]);
+  if (gift?.imagePath && !failed) {
+    return <img src={gift.imagePath} alt="" onError={() => setFailed(true)}
+      style={{width:size,height:size,objectFit:"contain",display:"block"}}/>;
+  }
+  return <span style={{fontSize:Math.round(size*0.78),lineHeight:1}}>{gift?.emoji || "🎁"}</span>;
+}
+
+// 선물 상세 팝업 — 상점 팝업과 동일 패턴(바텀시트 + 배경탭/X 닫기). 선물주기는 기존 로직 연결.
+function GiftDetailPopup({ gift, count, daily, onGive, onClose }) {
+  const done = (daily.giftCount ?? 0) >= 2;
+  const tr = TRAITS[gift.trait];
+  const gradeLabel = { normal:"일반", rare:"희귀", superrare:"초레어" }[gift.grade];
+  return (
+    <div onClick={onClose}
+      style={{position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,.65)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div onClick={e=>e.stopPropagation()}
+        style={{width:"100%",maxWidth:430,background:"linear-gradient(160deg,#3a2d6e,#5b3fa0)",borderRadius:"24px 24px 0 0",padding:"24px 24px 36px",display:"flex",flexDirection:"column",alignItems:"center",gap:13,animation:"fadeUp .25s ease",position:"relative"}}>
+        {/* 닫기 */}
+        <button onClick={onClose}
+          style={{position:"absolute",top:14,right:18,background:"rgba(255,255,255,.15)",border:"none",borderRadius:"50%",width:30,height:30,fontSize:16,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        {/* 이미지 */}
+        <div style={{width:120,height:120,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,.1)",borderRadius:20}}>
+          <GiftImage gift={gift} size={100}/>
+        </div>
+        {/* 이름 + 등급 */}
+        <div style={{fontFamily:"'Jua',sans-serif",fontSize:18,color:"#fff",textAlign:"center"}}>{gift.name}</div>
+        <div style={{fontSize:12,fontWeight:800,color:"rgba(255,255,255,.6)",background:"rgba(255,255,255,.1)",borderRadius:10,padding:"3px 12px"}}>{gradeLabel}</div>
+        {/* 설명 (데이터 파생) */}
+        <div style={{fontSize:13,color:"rgba(255,255,255,.65)",textAlign:"center",lineHeight:1.6,maxWidth:280}}>
+          주면 {tr.emoji} {tr.label} 성향이 <b style={{color:tr.color}}>+{gift.traitValue}</b> 올라요.
+        </div>
+        {/* 보유 수량 */}
+        <div style={{fontSize:13,color:"rgba(255,255,255,.5)"}}>보유 수량 <b style={{color:"#fff"}}>{count}개</b></div>
+        {/* 선물 주기 (기존 handleGiftGive 연결) */}
+        <button onClick={onGive} disabled={done}
+          style={{width:"100%",maxWidth:280,padding:"12px 0",borderRadius:14,border:"none",cursor:done?"not-allowed":"pointer",background:done?"rgba(255,255,255,.1)":"linear-gradient(135deg,#FF6B6B,#FF8E53)",color:done?"rgba(255,255,255,.3)":"#fff",fontWeight:800,fontSize:15,fontFamily:"'Jua',sans-serif"}}>
+          {done ? "오늘 선물 완료 (2/2) ✓" : `이 선물 주기 🎁 (${daily.giftCount??0}/2)`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function GiftBox({ inv, daily, sel, onSel, onGive, onBack }) {
-  const selected = inv.gifts.find(g=>g.instanceId===sel);
-  const gc = { normal:"rgba(255,255,255,.15)", rare:"rgba(79,195,247,.25)", superrare:"rgba(255,215,0,.25)" };
+  const selected = inv.gifts.find(g => g.instanceId === sel);
+  const selCount = selected ? inv.gifts.filter(g => g.id === selected.id).length : 0;
+  // 종류별 그룹 (master id 기준) — 카드 1개 = 1종류, count로 보유 수량 표시
+  const groups = Object.values(inv.gifts.reduce((acc, g) => {
+    if (!acc[g.id]) acc[g.id] = { ...g, count: 0, first: g.instanceId };
+    acc[g.id].count++;
+    return acc;
+  }, {}));
+  const gc = { normal:"rgba(255,255,255,.12)", rare:"rgba(79,195,247,.18)", superrare:"rgba(255,215,0,.18)" };
   const gb = { normal:"rgba(255,255,255,.2)", rare:"#4FC3F7", superrare:"#FFD700" };
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",padding:18,animation:"fadeUp .3s ease"}}>
@@ -1764,35 +1823,28 @@ function GiftBox({ inv, daily, sel, onSel, onGive, onBack }) {
         <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:"#fff"}}>🎁 선물함</h2>
         <span style={{marginLeft:"auto",fontSize:13,color:"rgba(255,255,255,.5)"}}>{inv.gifts.length}개</span>
       </div>
-      {inv.gifts.length===0
+      {inv.gifts.length === 0
         ? <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,color:"rgba(255,255,255,.4)"}}>
             <span style={{fontSize:48}}>📭</span><p style={{fontSize:13}}>선물이 없어요. 뽑기를 해보세요!</p>
           </div>
-        : <>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,flex:1,overflowY:"auto",marginBottom:10}}>
-              {inv.gifts.map(g=>(
-                <button key={g.instanceId} onClick={()=>onSel(g.instanceId===sel?null:g.instanceId)}
-                  style={{background:g.instanceId===sel?gc[g.grade]:"rgba(255,255,255,.1)",border:`2px solid ${g.instanceId===sel?gb[g.grade]:"rgba(255,255,255,.2)"}`,borderRadius:16,padding:"10px 6px",cursor:"pointer",textAlign:"center",transform:g.instanceId===sel?"scale(1.05)":"scale(1)",transition:"all .2s"}}>
-                  <div style={{fontSize:26,marginBottom:3}}>{g.emoji}</div>
-                  <div style={{fontSize:10,fontWeight:700,color:"#fff"}}>{g.name}</div>
-                  <div style={{fontSize:10,color:TRAITS[g.trait].color,marginTop:2}}>{TRAITS[g.trait].emoji}+{g.traitValue}</div>
-                </button>
-              ))}
-            </div>
-            {selected&&(
-              <div style={{background:"rgba(255,255,255,.14)",borderRadius:18,padding:"14px",backdropFilter:"blur(10px)",border:"1.5px solid rgba(255,255,255,.25)"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                  <span style={{fontSize:32}}>{selected.emoji}</span>
-                  <div><div style={{fontWeight:700,color:"#fff"}}>{selected.name}</div><div style={{fontSize:11,color:"rgba(255,255,255,.5)"}}>{{normal:"일반",rare:"희귀",superrare:"초레어"}[selected.grade]}</div></div>
+        : <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,flex:1,overflowY:"auto",alignContent:"start",paddingBottom:8}}>
+            {groups.map(g=>(
+              <button key={g.id} onClick={()=>onSel(g.first)}
+                style={{background:gc[g.grade],border:`2px solid ${gb[g.grade]}`,borderRadius:18,padding:"16px 8px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
+                <div style={{fontSize:40,lineHeight:1}}>{g.emoji}</div>
+                <div style={{fontSize:12,fontWeight:800,color:"#fff"}}>{g.name}</div>
+                <div style={{fontSize:11,color:TRAITS[g.trait].color,whiteSpace:"nowrap"}}>
+                  {TRAITS[g.trait].emoji} +{g.traitValue}
+                  {g.count>1 && <span style={{color:"rgba(255,255,255,.55)"}}> · {g.count}개 보유</span>}
                 </div>
-                <button onClick={onGive} disabled={(daily.giftCount??0)>=2}
-                  style={{width:"100%",background:(daily.giftCount??0)>=2?"rgba(255,255,255,.1)":"linear-gradient(135deg,#FF6B6B,#FF8E53)",border:"none",borderRadius:14,padding:"11px",fontSize:14,fontWeight:800,color:(daily.giftCount??0)>=2?"rgba(255,255,255,.3)":"#fff",cursor:(daily.giftCount??0)>=2?"not-allowed":"pointer",fontFamily:"'Jua',sans-serif"}}>
-                  {(daily.giftCount??0)>=2?"오늘 선물 완료 (2/2) ✓":`이 선물 주기 🎁 (${daily.giftCount??0}/2)`}
-                </button>
-              </div>
-            )}
-          </>
+              </button>
+            ))}
+          </div>
       }
+      {/* 상세 팝업 — sel(selGift) 구동. 주면 handleGiftGive가 setSelGift(null) → 자동 닫힘 */}
+      {selected && (
+        <GiftDetailPopup gift={selected} count={selCount} daily={daily} onGive={onGive} onClose={()=>onSel(null)}/>
+      )}
     </div>
   );
 }
