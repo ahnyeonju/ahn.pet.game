@@ -181,6 +181,18 @@ const GACHA_RATES      = { superrare: 3, rare: 20 };
 
 // 상점 상품 목록. owned/equipped는 inv.shopItems에 분리 저장.
 // 상품 추가 시 이 배열에 객체 1개만 추가하면 UI 자동 렌더링.
+// 뽑기 선물(GIFT_MASTER)을 상점 판매용으로 파생 — 이름·이모지·성향·등급을 그대로 재사용(중복 입력 없음).
+// GIFT_MASTER 한 곳만 수정하면 뽑기·상점 모두 반영. 가격은 등급별, 구매는 handleShopBuy의 gift_item 분기 사용.
+const GIFT_GRADE_LABEL = { normal:"일반", rare:"희귀", superrare:"초레어" };
+const GIFT_SHOP_PRICE  = { normal: 8, rare: 18, superrare: 35 };  // 등급별 판매가
+const GIFT_SHOP_ITEMS = GIFT_MASTER.map(g => ({
+  id: `gift_${g.id}`, category: "gift_item", giftRef: g.id,
+  price: GIFT_SHOP_PRICE[g.grade],
+  name: g.name, emoji: g.emoji, grade: g.grade, trait: g.trait, traitValue: g.val,
+  imagePath: g.imagePath ?? null,
+  description: `${TRAITS[g.trait].label} 성향 +${g.val} · ${GIFT_GRADE_LABEL[g.grade]} 선물`,
+}));
+
 const SHOP_MASTER = [
   // ── background ──────────────────────────────────────────
   {
@@ -203,10 +215,8 @@ const SHOP_MASTER = [
   // decoration과 동일하게 방에 배치되지만 벽(상단) 영역에만 놓인다.
   { id:"win_001", name:"동그란 창문", category:"window", price:10, imagePath:"/images/shop/windows/win_001.png", description:"벽에 다는 아늑한 동그란 창문이에요." },
 
-  // ── gift_item ────────────────────────────────────────────
-  // 구매 즉시 inv.gifts에 인스턴스 추가. giftRef = GIFT_MASTER.id
-  // 예시:
-  // { id:"gift_shop_001", name:"번개 결정체", category:"gift_item", price:20, imagePath:"/images/shop/gifts/gift_shop_001.png", description:"활발함 +3 초레어", giftRef:"g13" },
+  // ── gift_item ── 뽑기 선물(GIFT_MASTER)을 파생 주입. 구매 즉시 inv.gifts에 인스턴스 추가(handleShopBuy).
+  ...GIFT_SHOP_ITEMS,
 ];
 
 // 이미지가 없을 때 카테고리별 이모지 fallback
@@ -354,6 +364,10 @@ body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-conten
 // ===================================================
 // 앱
 // ===================================================
+// 큰 이벤트 팝업(EventPopup) 비활성화 스위치. false면 좌측 미니 팝업(이벤트 카드+툴팁)만 사용.
+// 컴포넌트·렌더·트리거는 보존 — 나중에 true로 바꾸면 자동 팝업 재활성.
+const EVENT_POPUP_ENABLED = false;
+
 export default function App() {
   const saved = loadState();
   const [screen, setScreen] = useState(saved ? "home" : "egg_select");
@@ -380,7 +394,7 @@ export default function App() {
     if (daily.date !== today) {
       const ev = rollDailyEvent();
       setDaily({ ...DEFAULT_DAILY, date:today, event:ev, growthMultiplier: ev?.type==="aurora"?EVENT_REWARDS.aurora.growthMultiplier:1 });
-      if (ev) setTimeout(() => setPopup("event"), 900);
+      if (ev && EVENT_POPUP_ENABLED && screen !== "egg_select") setTimeout(() => setPopup("event"), 900);  // 큰 팝업 비활성(미니만)·펫 선택화면 제외
     }
   }, []);
 
@@ -471,10 +485,10 @@ export default function App() {
   const devSetTrait     = (t,d)=> setPet(p=>({...p,traits:{...p.traits,[t]:Math.max(0,p.traits[t]+d)}}));
   const devForceForm    = fk  => { setPet(p=>({...p,stage:3,finalForm:fk,growthPoint:GROWTH_THRESHOLDS.stage3})); setInv(i=>({...i,unlockedPets:[...new Set([...i.unlockedPets,fk])]})); showToast(`🔧 ${FINAL_FORMS[fk].name} 강제 적용`); setPopup(null); };
   const devForceEvo     = s   => { if(s===2){ setEvoData({stage:2,finalForm:null}); } else { setEvoData({stage:3,finalForm:determineFinalForm(pet.traits,ghist)}); } setPopup("evolution"); };
-  const devResetDay     = ()  => { const ev=rollDailyEvent(); setDaily({...DEFAULT_DAILY,date:getTodayStr(),event:ev,growthMultiplier:ev?.type==="aurora"?EVENT_REWARDS.aurora.growthMultiplier:1}); if(ev) setTimeout(()=>setPopup("event"),900); showToast("🔧 하루 초기화"); };
+  const devResetDay     = ()  => { const ev=rollDailyEvent(); setDaily({...DEFAULT_DAILY,date:getTodayStr(),event:ev,growthMultiplier:ev?.type==="aurora"?EVENT_REWARDS.aurora.growthMultiplier:1}); if(ev && EVENT_POPUP_ENABLED) setTimeout(()=>setPopup("event"),900); showToast("🔧 하루 초기화"); };
   const devFillMissions = ()  => { setDaily(d=>({...d,missions:{...d.missions,feed:true,play:true,clean:true,gift:true,statusCheck:true,allCompleted:true}})); showToast("🔧 미션 모두 완료 처리"); };
   const devClaimAll     = ()  => { setDaily(d=>({...d,claimed:{feed:true,play:true,clean:true,gift:true,statusCheck:true,allComplete:true}})); showToast("🔧 모든 보상 수령 처리"); };
-  const devRollEvent    = ()  => { const ev=rollDailyEvent(); setDaily(d=>({...d,event:ev,eventRewardClaimed:false,growthMultiplier:ev?.type==="aurora"?EVENT_REWARDS.aurora.growthMultiplier:1})); if(ev) setTimeout(()=>setPopup("event"),300); showToast(ev?`🔧 이벤트: ${ev.name}`:"🔧 이벤트 없음 (30% 미달)"); };
+  const devRollEvent    = ()  => { const ev=rollDailyEvent(); setDaily(d=>({...d,event:ev,eventRewardClaimed:false,growthMultiplier:ev?.type==="aurora"?EVENT_REWARDS.aurora.growthMultiplier:1})); if(ev && EVENT_POPUP_ENABLED) setTimeout(()=>setPopup("event"),300); showToast(ev?`🔧 이벤트: ${ev.name}`:"🔧 이벤트 없음 (30% 미달)"); };
   const devResetAll     = ()  => { const ev=rollDailyEvent(); setEgg(null); setPet(DEFAULT_PET); setDaily({...DEFAULT_DAILY,date:getTodayStr(),event:ev,growthMultiplier:ev?.type==="aurora"?EVENT_REWARDS.aurora.growthMultiplier:1}); setInv(DEFAULT_INV); setGhist([]); setPopup(null); setScreen("egg_select"); localStorage.removeItem("tama_v2"); showToast("🔧 전체 초기화 완료"); };
 
   const handleDraw = (isFree=false) => {
@@ -1465,7 +1479,7 @@ function TopBar({ pet, inv, daily, growthPct, growthMax, getPetEmoji, getPetName
           <div style={{width:`${(missionDone/5)*100}%`,height:"100%",background:"#FFD700",borderRadius:2}}/>
         </div>
         <span style={{fontSize:8,color:"rgba(255,255,255,.65)",fontWeight:700,letterSpacing:-0.3}}>{resetIn}</span>
-        {daily.missions.allCompleted&&<div style={{position:"absolute",top:-4,right:-4,width:10,height:10,background:"#FF5722",borderRadius:"50%"}}/>}
+        {daily.missions.allCompleted && !daily.claimed?.allComplete && <div style={{position:"absolute",top:-4,right:-4,width:10,height:10,background:"#FF5722",borderRadius:"50%"}}/>}
       </button>
 
       {/* 설정 */}
@@ -1883,7 +1897,7 @@ function Collection({ inv, onBack }) {
 function ShopItemImage({ item, size=64 }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => { setFailed(false); }, [item.imagePath]);
-  const fallback = CATEGORY_FALLBACK[item.category] || "🛍️";
+  const fallback = item.emoji || CATEGORY_FALLBACK[item.category] || "🛍️";  // 선물은 자기 이모지
   if (item.imagePath && !failed) {
     return (
       <img src={item.imagePath} alt="" onError={() => setFailed(true)}
