@@ -194,7 +194,8 @@ const GACHA_RATES      = { superrare: 3, rare: 20 };
 // 뽑기 선물(GIFT_MASTER)을 상점 판매용으로 파생 — 이름·이모지·성향·등급을 그대로 재사용(중복 입력 없음).
 // GIFT_MASTER 한 곳만 수정하면 뽑기·상점 모두 반영. 가격은 등급별, 구매는 handleShopBuy의 gift_item 분기 사용.
 const GIFT_GRADE_LABEL = { normal:"일반", rare:"희귀", superrare:"초레어" };
-const GIFT_SHOP_PRICE  = { normal: 8, rare: 18, superrare: 35 };  // 등급별 판매가
+const GIFT_SHOP_PRICE  = { normal: 8, rare: 18, superrare: 35 };  // 상점 구매가(등급별)
+const GIFT_SELL_PRICE  = { normal: 3, rare: 5, superrare: 8 };    // 선물함 판매가(등급별, 개당)
 const GIFT_SHOP_ITEMS = GIFT_MASTER.map(g => ({
   id: `gift_${g.id}`, category: "gift_item", giftRef: g.id,
   price: GIFT_SHOP_PRICE[g.grade],
@@ -523,6 +524,17 @@ export default function App() {
     showToast(`🎁 ${g.name} 선물! ${TRAITS[g.trait].label} +${g.traitValue}${suffix}`);
     setSelGift(null);
   };
+  // 선물 판매 — 같은 종류(id) 중 qty개를 재화로 교환. 등급별 개당가(GIFT_SELL_PRICE) × qty 누적.
+  const handleGiftSell = (giftId, qty) => {
+    const same = inv.gifts.filter(g => g.id === giftId);
+    if(same.length === 0) return;
+    const n = Math.max(1, Math.min(qty, same.length));
+    const gain = GIFT_SELL_PRICE[same[0].grade] * n;
+    const removeIds = new Set(same.slice(-n).map(g => g.instanceId));  // 뒤에서 n개 제거(그룹 대표 인스턴스 보존)
+    setInv(i => ({ ...i, currency: i.currency + gain, gifts: i.gifts.filter(g => !removeIds.has(g.instanceId)) }));
+    showToast(`💰 ${same[0].name} ${n}개 판매 +${gain}`);
+    if(n >= same.length) setSelGift(null);  // 다 팔면 팝업 닫기
+  };
   // ─── Dev 전용 액션 (DevPanel에서만 호출, import.meta.env.DEV 게이트) ───
   const devSetGrowth    = v   => setPet(p=>({...p,growthPoint:Math.max(0,Math.min(999,parseInt(v)||0))}));
   const devSetTrait     = (t,d)=> setPet(p=>({...p,traits:{...p.traits,[t]:Math.max(0,p.traits[t]+d)}}));
@@ -722,7 +734,7 @@ export default function App() {
         {screen==="minigame" && game && <MiniGame game={game} onAnswer={handleGameAnswer} onBack={()=>setScreen("home")}/>}
         {screen==="mission"  && <MissionScreen daily={daily} onClaim={claimReward} onBack={()=>setScreen("home")}/>}
         {screen==="gacha"    && <GachaScreen inv={inv} daily={daily} lastDraw={lastDraw} onDraw={handleDraw} onBack={()=>setScreen("home")}/>}
-        {screen==="giftbox"  && <GiftBox inv={inv} daily={daily} sel={selGift} onSel={setSelGift} onGive={handleGiftGive} onBack={()=>setScreen("home")}/>}
+        {screen==="giftbox"  && <GiftBox inv={inv} daily={daily} sel={selGift} onSel={setSelGift} onGive={handleGiftGive} onSell={handleGiftSell} onBack={()=>setScreen("home")}/>}
         {screen==="collection"&&<Collection inv={inv} onBack={()=>setScreen("home")}/>}
         {screen==="shop"     && <Shop inv={inv} onBuy={handleShopBuy} onBack={()=>setScreen("home")}/>}
         {screen==="skill"    && <SkillScreen pet={pet} onBack={()=>setScreen("home")}/>}
@@ -1903,10 +1915,14 @@ function GiftImage({ gift, size = 100 }) {
 }
 
 // 선물 상세 팝업 — 상점 팝업과 동일 패턴(바텀시트 + 배경탭/X 닫기). 선물주기는 기존 로직 연결.
-function GiftDetailPopup({ gift, count, daily, onGive, onClose }) {
+function GiftDetailPopup({ gift, count, daily, onGive, onSell, onClose }) {
   const done = (daily.giftCount ?? 0) >= 2;
   const tr = TRAITS[gift.trait];
   const gradeLabel = { normal:"일반", rare:"희귀", superrare:"초레어" }[gift.grade];
+  const unitPrice = GIFT_SELL_PRICE[gift.grade];
+  const [sellMode, setSellMode] = useState(false);
+  const [qty, setQty] = useState(1);
+  useEffect(() => { setQty(q => Math.max(1, Math.min(q, count))); }, [count]);  // 보유 수량 변동 시 qty 보정
   return (
     <div onClick={onClose}
       style={{position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,.65)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
@@ -1928,17 +1944,40 @@ function GiftDetailPopup({ gift, count, daily, onGive, onClose }) {
         </div>
         {/* 보유 수량 */}
         <div style={{fontSize:13,color:"rgba(255,255,255,.5)"}}>보유 수량 <b style={{color:"#fff"}}>{count}개</b></div>
-        {/* 선물 주기 (기존 handleGiftGive 연결) */}
-        <button onClick={onGive} disabled={done}
-          style={{width:"100%",maxWidth:280,padding:"12px 0",borderRadius:14,border:"none",cursor:done?"not-allowed":"pointer",background:done?"rgba(255,255,255,.1)":"linear-gradient(135deg,#FF6B6B,#FF8E53)",color:done?"rgba(255,255,255,.3)":"#fff",fontWeight:800,fontSize:15,fontFamily:"'Jua',sans-serif"}}>
-          {done ? "오늘 선물 완료 (2/2) ✓" : `이 선물 주기 🎁 (${daily.giftCount??0}/2)`}
-        </button>
+        {/* 선물 주기 | 판매 (나란히) */}
+        <div style={{display:"flex",gap:10,width:"100%",maxWidth:280}}>
+          <button onClick={onGive} disabled={done}
+            style={{flex:1.3,padding:"12px 0",borderRadius:14,border:"none",cursor:done?"not-allowed":"pointer",background:done?"rgba(255,255,255,.1)":"linear-gradient(135deg,#FF6B6B,#FF8E53)",color:done?"rgba(255,255,255,.3)":"#fff",fontWeight:800,fontSize:14,fontFamily:"'Jua',sans-serif"}}>
+            {done ? "선물 완료 ✓" : `선물 주기 🎁 (${daily.giftCount??0}/2)`}
+          </button>
+          <button onClick={()=>setSellMode(s=>!s)}
+            style={{flex:1,padding:"12px 0",borderRadius:14,border:"none",cursor:"pointer",background:sellMode?"rgba(67,160,71,.55)":"linear-gradient(135deg,#43a047,#66bb6a)",color:"#fff",fontWeight:800,fontSize:14,fontFamily:"'Jua',sans-serif"}}>
+            판매 💰
+          </button>
+        </div>
+        {/* 판매 패널 — 수량 선택 후 OK */}
+        {sellMode && (
+          <div style={{width:"100%",maxWidth:280,background:"rgba(0,0,0,.22)",borderRadius:14,padding:"14px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.7)"}}>개당 <b style={{color:"#FFD700"}}>{unitPrice}💰</b></div>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <button onClick={()=>setQty(q=>Math.max(1,q-1))}
+                style={{width:34,height:34,borderRadius:"50%",border:"none",background:"rgba(255,255,255,.15)",color:"#fff",fontSize:20,fontWeight:800,cursor:"pointer"}}>−</button>
+              <span style={{fontFamily:"'Jua',sans-serif",fontSize:16,color:"#fff",minWidth:54,textAlign:"center"}}>{qty} / {count}</span>
+              <button onClick={()=>setQty(q=>Math.min(count,q+1))}
+                style={{width:34,height:34,borderRadius:"50%",border:"none",background:"rgba(255,255,255,.15)",color:"#fff",fontSize:20,fontWeight:800,cursor:"pointer"}}>+</button>
+            </div>
+            <button onClick={()=>onSell(gift.id, qty)}
+              style={{width:"100%",padding:"11px 0",borderRadius:12,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#F7971E,#FFD200)",color:"#fff",fontWeight:800,fontSize:14,fontFamily:"'Jua',sans-serif"}}>
+              {qty}개 판매하고 +{unitPrice*qty}💰 받기 (OK)
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function GiftBox({ inv, daily, sel, onSel, onGive, onBack }) {
+function GiftBox({ inv, daily, sel, onSel, onGive, onSell, onBack }) {
   const selected = inv.gifts.find(g => g.instanceId === sel);
   const selCount = selected ? inv.gifts.filter(g => g.id === selected.id).length : 0;
   // 종류별 그룹 (master id 기준) — 카드 1개 = 1종류, count로 보유 수량 표시
@@ -1976,7 +2015,7 @@ function GiftBox({ inv, daily, sel, onSel, onGive, onBack }) {
       }
       {/* 상세 팝업 — sel(selGift) 구동. 주면 handleGiftGive가 setSelGift(null) → 자동 닫힘 */}
       {selected && (
-        <GiftDetailPopup gift={selected} count={selCount} daily={daily} onGive={onGive} onClose={()=>onSel(null)}/>
+        <GiftDetailPopup gift={selected} count={selCount} daily={daily} onGive={onGive} onSell={onSell} onClose={()=>onSel(null)}/>
       )}
     </div>
   );
