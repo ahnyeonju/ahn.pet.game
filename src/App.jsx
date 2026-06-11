@@ -641,10 +641,15 @@ export default function App() {
 
   const getPetEmoji = () => pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.emoji||"✨" : pet.stage===2?"🐣":"🥚";
   const getPetName  = () => pet.name || (pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.name||`${pet.stage}단계` : `${pet.stage}단계`);
-  const getPetImg   = () => { if(pet.stage===3&&pet.finalForm) return `/images/pets/stage3/${pet.finalForm}.png`; if(pet.stage===2) return "/images/pets/stage2/growth.png"; return `/images/pets/stage1/${egg||"default"}.png`; };
+  // 정적 이미지 경로: 모션과 동일 폴더 구조. 1·2단계는 알별, 3단계는 진화체별. 파일명 static.png.
+  const getPetImg   = () => { const dir = pet.stage===3&&pet.finalForm ? `stage3/${pet.finalForm}` : `${egg||"egg_red"}/stage${pet.stage}`; return `/images/pets/${dir}/static.png`; };
   // 모션 에셋 경로 — 폼별 파이프라인. 현재 전 폼 미보유 → 공용 _test 사용(v1).
-  // TODO(per-form): 폼별 에셋 생기면 stage/finalForm 기준 경로 반환하도록 확장.
-  const getPetMotion = () => ({ stand: "/images/pets/_test/stand.webp", walk: "/images/pets/_test/walk.webp" });
+  // 모션 경로: 1·2단계는 알별 pets/{알}/stage{N}/, 3단계는 진화체별 pets/stage3/{finalForm}/.
+  // 에셋 없는 단계는 WanderingPet이 정적 fallback 처리.
+  const getPetMotion = () => {
+    const dir = pet.stage===3&&pet.finalForm ? `stage3/${pet.finalForm}` : `${egg||"egg_red"}/stage${pet.stage}`;
+    return { stand:`/images/pets/${dir}/stand.webp`, walk:`/images/pets/${dir}/walk.webp` };
+  };
 
   const growthMax = pet.stage===1 ? GROWTH_THRESHOLDS.stage2 : GROWTH_THRESHOLDS.stage3;
   const growthPct = Math.min(100,(pet.growthPoint/growthMax)*100);
@@ -683,7 +688,7 @@ export default function App() {
         {popup==="status"    && <StatusPopup pet={pet} growthMax={growthMax} canEvolve={canEvolve} onEvolve={handleEvolve} onClose={()=>setPopup(null)} petName={getPetName()} petMotion={getPetMotion()} petEmoji={getPetEmoji()}/>}
         {popup==="event"     && daily.event && <EventPopup event={daily.event} claimed={daily.eventRewardClaimed} onClaim={handleEventReward} onClose={()=>setPopup(null)}/>}
         {popup==="rainbow"   && <RainbowPopup onChoose={handleRainbow} onClose={()=>setPopup(null)}/>}
-        {popup==="evolution" && evoData && <EvoPopup data={evoData} onConfirm={handleEvoConfirm}/>}
+        {popup==="evolution" && evoData && <EvoPopup data={evoData} egg={egg} onConfirm={handleEvoConfirm}/>}
         {popup==="settings"  && <SettingsPopup onClose={()=>setPopup(null)} onExport={handleExport} onImport={handleImport}/>}
         {popup==="devpanel" && import.meta.env.DEV && (
           <DevPanel
@@ -989,7 +994,7 @@ function EggSelect({ onSelect }) {
           <button key={e.id} onMouseEnter={()=>setHov(e.id)} onMouseLeave={()=>setHov(null)} onClick={()=>onSelect(e.id, trimmed)}
             style={{background:hov===e.id?e.color:"rgba(255,255,255,.15)",border:`2px solid ${hov===e.id?"rgba(0,0,0,.15)":"rgba(255,255,255,.25)"}`,borderRadius:20,padding:"16px 8px",cursor:"pointer",transform:hov===e.id?"scale(1.06)":"scale(1)",transition:"all .2s",backdropFilter:"blur(8px)"}}>
             <div style={{display:"flex",justifyContent:"center",marginBottom:5}}>
-              <PetSprite size={38} emoji="🥚" imgSrc={`/images/pets/stage1/${e.id}.png`}/>
+              <PetSprite size={38} emoji="🥚" imgSrc={`/images/pets/${e.id}/stage1/static.png`}/>
             </div>
             <div style={{fontFamily:"'Jua',sans-serif",fontSize:12,color:hov===e.id?"#333":"#fff",fontWeight:700}}>{e.label}</div>
             {hov===e.id&&<div style={{fontSize:10,color:"#555",marginTop:3}}>{e.hint}</div>}
@@ -2433,7 +2438,7 @@ function RainbowPopup({ onChoose, onClose }) {
 // ===================================================
 // 팝업: 진화
 // ===================================================
-function EvoPopup({ data, onConfirm }) {
+function EvoPopup({ data, egg, onConfirm }) {
   const is3 = data.stage===3;
   const form = is3&&data.finalForm ? FINAL_FORMS[data.finalForm] : null;
   return (
@@ -2441,7 +2446,7 @@ function EvoPopup({ data, onConfirm }) {
       <div style={{background:is3?"rgba(8,6,20,.98)":"rgba(16,14,36,.96)",backdropFilter:"blur(20px)",borderRadius:32,padding:"38px 26px",width:"88%",maxWidth:360,textAlign:"center",border:`2px solid ${is3?"#FFD700":"rgba(255,255,255,.2)"}`,animation:is3?"glow 2s ease infinite, pop .5s ease":"pop .4s ease"}}>
         <div style={{fontSize:15,color:is3?"#FFD700":"rgba(255,255,255,.55)",marginBottom:6,fontWeight:700}}>{is3?"✨ 최종 진화!":"🎉 진화!"}</div>
         <div style={{marginBottom:14,animation:"float 2s ease-in-out infinite",display:"flex",justifyContent:"center"}}>
-          <PetSprite size={84} emoji={form?form.emoji:"🐣"} imgSrc={form?`/images/pets/stage3/${data.finalForm}.png`:"/images/pets/stage2/growth.png"}/>
+          <PetSprite size={84} emoji={form?form.emoji:"🐣"} imgSrc={form?`/images/pets/stage3/${data.finalForm}/static.png`:`/images/pets/${egg||"egg_red"}/stage2/static.png`}/>
         </div>
         <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:23,color:"#fff",marginBottom:5}}>{form?form.name:"성장체"}</h2>
         <p style={{color:"rgba(255,255,255,.55)",fontSize:13,marginBottom:is3?14:22}}>{is3?"드디어 최종 진화했어요!":"한 단계 더 성장했어요!"}</p>
