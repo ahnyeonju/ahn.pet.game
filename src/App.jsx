@@ -206,6 +206,9 @@ const SHOP_MASTER = [
   },
   // 예시 (파일 추가 후 price/description 수정):
   { id:"bg_001", name:"오로라 설산", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_001.png", description:"신비로운 우주 배경" },
+  { id:"bg_002", name:"크리스마스 배경", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_002.png", description:"크리스마스의 아늑한 배경" },
+
+  
 
   // ── decoration ───────────────────────────────────────────
   // 예시:
@@ -650,7 +653,7 @@ export default function App() {
   return (
     <>
       <style>{CSS}</style>
-      <div className="shell" style={{ background: wm.bg, transition:"background 1.2s ease" }}>
+      <div className="shell" style={{ background: (screen!=="home" && screen!=="egg_select") ? `linear-gradient(rgba(17,17,25,.45),rgba(17,17,25,.45)),${wm.bg}` : wm.bg, transition:"background 1.2s ease" }}>
         <WeatherFX weather={weather}/>
         {toast && <Toast {...toast}/>}
 
