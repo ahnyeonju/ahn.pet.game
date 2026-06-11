@@ -414,7 +414,7 @@ const EVENT_POPUP_ENABLED = false;
 
 export default function App() {
   const saved = loadState();
-  const [screen, setScreen] = useState(saved ? "home" : "egg_select");
+  const [screen, setScreen] = useState(saved?.egg ? "home" : "egg_select");  // egg 미선택(첫 시작·새 펫 대기)이면 알 선택 화면
   const [egg,    setEgg]    = useState(saved?.egg   || null);
   const [pet,    setPet]    = useState(saved?.pet   || DEFAULT_PET);
   const [daily,  setDaily]  = useState(saved?.daily || DEFAULT_DAILY);
@@ -428,6 +428,7 @@ export default function App() {
   const [lastDraw,setLastDraw]= useState(null);
   const [devMode,    setDevMode]    = useState(false);
   const [devWeather, setDevWeather] = useState(null); // null = 실제 날씨 사용
+  const newPetRef = useRef(false);  // "다른 펫 키우기" 진입 시 handleEggSelect가 inv·daily를 보존하도록 표시
 
   const weather = (import.meta.env.DEV && devWeather) ? devWeather : getWeather();
   const wm = WEATHER_META[weather];
@@ -663,8 +664,21 @@ export default function App() {
   };
   const handleEggSelect = (id, name) => {
     const newPet = { ...DEFAULT_PET, name };
+    const keep = newPetRef.current; newPetRef.current = false;  // 다른 펫 키우기면 inv·daily 유지(처음 시작은 초기화)
     setEgg(id); setPet(newPet); setScreen("home");
-    saveState({ egg:id, pet:newPet, daily:{...DEFAULT_DAILY,date:getTodayStr()}, inv:DEFAULT_INV, ghist:[] });
+    saveState({
+      egg:id, pet:newPet,
+      daily: keep ? daily : { ...DEFAULT_DAILY, date:getTodayStr() },
+      inv:   keep ? inv   : DEFAULT_INV,
+      ghist:[],
+    });
+  };
+  // 다 키운 펫(최종 진화 완료)을 도감에 남기고 새 펫을 처음부터. inv·daily 유지, pet·egg·ghist만 초기화.
+  const startNewPet = () => {
+    newPetRef.current = true;
+    setEgg(null); setPet(DEFAULT_PET); setGhist([]);
+    setPopup(null); setScreen("egg_select");
+    saveState({ egg:null, pet:DEFAULT_PET, daily, inv, ghist:[] });
   };
   const handleShare = () => {
     const text = `내 펫 ${getPetName()}을(를) 키우고 있어요! 🥚 함께 키워볼까요?`;
@@ -739,7 +753,8 @@ export default function App() {
         {screen==="shop"     && <Shop inv={inv} onBuy={handleShopBuy} onBack={()=>setScreen("home")}/>}
         {screen==="skill"    && <SkillScreen pet={pet} onBack={()=>setScreen("home")}/>}
 
-        {popup==="status"    && <StatusPopup pet={pet} growthMax={growthMax} canEvolve={canEvolve} onEvolve={handleEvolve} onClose={()=>setPopup(null)} petName={getPetName()} petMotion={getPetMotion()} petEmoji={getPetEmoji()}/>}
+        {popup==="status"    && <StatusPopup pet={pet} growthMax={growthMax} canEvolve={canEvolve} onEvolve={handleEvolve} onNewPet={()=>setPopup("newpet")} onClose={()=>setPopup(null)} petName={getPetName()} petMotion={getPetMotion()} petEmoji={getPetEmoji()}/>}
+        {popup==="newpet"    && <NewPetConfirmPopup petName={getPetName()} onConfirm={startNewPet} onCancel={()=>setPopup("status")}/>}
         {popup==="event"     && daily.event && <EventPopup event={daily.event} claimed={daily.eventRewardClaimed} onClaim={handleEventReward} onClose={()=>setPopup(null)}/>}
         {popup==="rainbow"   && <RainbowPopup onChoose={handleRainbow} onClose={()=>setPopup(null)}/>}
         {popup==="evolution" && evoData && <EvoPopup data={evoData} egg={egg} onConfirm={handleEvoConfirm}/>}
@@ -2444,7 +2459,7 @@ function SkillScreen({ pet, onBack }) {
 // ===================================================
 // 팝업: 내 펫 상태 (? 버블 포함)
 // ===================================================
-function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onClose, petName, petMotion, petEmoji }) {
+function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onNewPet, onClose, petName, petMotion, petEmoji }) {
   const [tipStatus, setTipStatus] = useState(false);
   const [tipTrait,  setTipTrait]  = useState(false);
   const maxTrait = Math.max(...Object.values(pet.traits));
@@ -2579,6 +2594,12 @@ function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onClose, petName, pe
             ✨ 진화 가능! 진화하기
           </button>
         )}
+        {!canEvolve && pet.stage===3 && pet.finalForm && (
+          <button onClick={onNewPet} style={{width:"100%",marginTop:16,background:"linear-gradient(135deg,#43a047,#66bb6a)",border:"none",borderRadius:14,padding:"13px",fontSize:15,fontWeight:800,color:"#fff",cursor:"pointer",fontFamily:"'Jua',sans-serif",letterSpacing:0.5,boxShadow:"0 4px 20px rgba(67,160,71,.4)"}}>
+            🥚 다른 펫 키우기
+            <div style={{fontSize:11,fontWeight:700,opacity:.85,marginTop:2}}>기존 펫은 도감에 등록돼요</div>
+          </button>
+        )}
       </div>
     </Overlay>
   );
@@ -2649,6 +2670,26 @@ function EvoPopup({ data, egg, onConfirm }) {
           </div>
         )}
         <button onClick={onConfirm} style={{width:"100%",background:is3?"linear-gradient(135deg,#FFD700,#FF8C00)":"linear-gradient(135deg,#4CAF50,#8BC34A)",border:"none",borderRadius:16,padding:"13px",fontSize:15,fontWeight:800,color:"#fff",cursor:"pointer",fontFamily:"'Jua',sans-serif"}}>확인!</button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ===================================================
+// 팝업: 다른 펫 키우기 확인 (최종 진화 완료 펫 → 새 펫 시작)
+// ===================================================
+function NewPetConfirmPopup({ petName, onConfirm, onCancel }) {
+  return (
+    <Overlay style={{zIndex:10000}}>
+      <div style={{background:"rgba(16,14,36,.97)",backdropFilter:"blur(20px)",borderRadius:28,padding:"30px 24px",width:"86%",maxWidth:340,textAlign:"center",border:"1.5px solid rgba(255,255,255,.15)",animation:"pop .35s ease"}}>
+        <div style={{fontSize:48,marginBottom:10}}>🥚</div>
+        <h3 style={{fontFamily:"'Jua',sans-serif",fontSize:19,color:"#fff",marginBottom:8}}>다른 펫 키우기</h3>
+        <p style={{color:"rgba(255,255,255,.6)",fontSize:13,marginBottom:6,lineHeight:1.5}}><b style={{color:"#fff"}}>{petName}</b>은(는) 도감에 등록돼 있어요.<br/>새 펫을 처음부터 키울까요?</p>
+        <p style={{color:"rgba(255,255,255,.4)",fontSize:11,marginBottom:18}}>재화·티켓·선물·도감·방 꾸미기는 그대로 유지돼요.</p>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={onCancel} style={{flex:1,background:"rgba(255,255,255,.12)",border:"none",borderRadius:14,padding:"12px",fontSize:14,fontWeight:800,color:"#fff",cursor:"pointer",fontFamily:"'Jua',sans-serif"}}>취소</button>
+          <button onClick={onConfirm} style={{flex:1.4,background:"linear-gradient(135deg,#43a047,#66bb6a)",border:"none",borderRadius:14,padding:"12px",fontSize:14,fontWeight:800,color:"#fff",cursor:"pointer",fontFamily:"'Jua',sans-serif",boxShadow:"0 4px 20px rgba(67,160,71,.4)"}}>새 펫 키우기</button>
+        </div>
       </div>
     </Overlay>
   );
