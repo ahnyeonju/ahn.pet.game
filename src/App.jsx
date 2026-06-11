@@ -685,12 +685,13 @@ export default function App() {
   const getPetName  = () => pet.name || (pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.name||`${pet.stage}단계` : `${pet.stage}단계`);
   // 정적 이미지 경로: 모션과 동일 폴더 구조. 1·2단계는 알별, 3단계는 진화체별. 파일명 static.png.
   const getPetImg   = () => { const dir = pet.stage===3&&pet.finalForm ? `stage3/${pet.finalForm}` : `${egg||"egg_red"}/stage${pet.stage}`; return `/images/pets/${dir}/static.png`; };
-  // 모션 에셋 경로 — 폼별 파이프라인. 현재 전 폼 미보유 → 공용 _test 사용(v1).
   // 모션 경로: 1·2단계는 알별 pets/{알}/stage{N}/, 3단계는 진화체별 pets/stage3/{finalForm}/.
-  // 에셋 없는 단계는 WanderingPet이 정적 fallback 처리.
+  // stand·walk + 감정(PET_EMOTIONS) 키를 반환. 에셋 없는 키는 로드 실패 시 stand로 fallback.
   const getPetMotion = () => {
     const dir = pet.stage===3&&pet.finalForm ? `stage3/${pet.finalForm}` : `${egg||"egg_red"}/stage${pet.stage}`;
-    return { stand:`/images/pets/${dir}/stand.webp`, walk:`/images/pets/${dir}/walk.webp` };
+    const m = { stand:`/images/pets/${dir}/stand.webp`, walk:`/images/pets/${dir}/walk.webp` };
+    PET_EMOTIONS.forEach(e => { m[e.motion] = `/images/pets/${dir}/${e.motion}.webp`; });
+    return m;
   };
 
   const growthMax = pet.stage===1 ? GROWTH_THRESHOLDS.stage2 : GROWTH_THRESHOLDS.stage3;
@@ -852,7 +853,7 @@ const PET_MOTION_CFG = {
   walkMin: 4000, walkMax: 7000,
   idleMin: 3000, idleMax: 8000,
   longRestEvery: 3, longRestMs: 12000,
-  standAfterDrop: 2000, oneShotMs: 1300, bubbleMs: 1800,
+  standAfterDrop: 2000, oneShotMs: 3000, bubbleMs: 1800,  // oneShotMs: 감정 모션 재생 시간(webp 1루프 ~1.1s → 약 2~3회 반복)
   tapWindow: 1200, tapsForEmotion: 3, dragThresh: 8,
   floorTopPct: 0.64, floorBottomPct: 0.97,  // 펫 발이 머무는 마루 밴드(컨테이너 높이 대비)
 };
@@ -901,7 +902,9 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
     if (!container || !wrap || !img) return;
 
     const C = PET_MOTION_CFG;
-    const MOTIONS = { stand: motion.stand, walk: motion.walk };  // 키→src. 없는 키(감정)는 stand로
+    const MOTIONS = { ...motion };  // stand·walk + 감정 키. 로드 실패 src는 failedSrc에 기록해 stand로
+    const failedSrc = new Set();
+    img.onerror = () => { failedSrc.add(curSrc); if (curSrc !== MOTIONS.stand) { curSrc = MOTIONS.stand; img.src = MOTIONS.stand; } };
     const STATE_MOTION = { idle: "stand", walk: "walk", grabbed: "stand" };
     const now = () => performance.now();
 
@@ -943,16 +946,17 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
       pet.x += (dx / d) * C.speed; pet.y += (dy / d) * C.speed;
       if (Math.abs(dx) > 0.5) pet.facing = dx > 0 ? 1 : -1;
     }
-    function showBubble(text) { bubbleText.textContent = text; bubbleUntil = now() + C.bubbleMs; }
+    function showBubble(text, ms = C.bubbleMs) { bubbleText.textContent = text; bubbleUntil = now() + ms; }
     function playOneShot(key) { pet.oneShotMotion = key; pet.state = "oneshot"; motionUntil = now() + C.oneShotMs; target = null; }
     function triggerEmotion() {
       const e = PET_EMOTIONS[Math.floor(Math.random() * PET_EMOTIONS.length)];
-      playOneShot(e.motion); showBubble(e.line);
+      playOneShot(e.motion); showBubble(e.line, C.oneShotMs);  // 말풍선을 감정 모션 길이만큼 유지
     }
 
     function render() {
       const key = pet.state === "oneshot" ? pet.oneShotMotion : (STATE_MOTION[pet.state] || "stand");
-      const src = MOTIONS[key] || MOTIONS.stand;  // 감정 등 자산 없는 키 → stand
+      let src = MOTIONS[key] || MOTIONS.stand;  // 키→src
+      if (failedSrc.has(src)) src = MOTIONS.stand;  // 로드 실패한 감정 webp는 stand로 폴백
       if (src !== curSrc) { img.src = src; curSrc = src; }  // 바뀔 때만(애니 리셋 방지)
       wrap.style.transform = `translate(${pet.x - scrollXRef.current - petSize / 2}px, ${pet.y - petSize / 2}px)`;  // 월드→화면: scrollX만큼 밀림(배경에 박힘)
       img.style.transform = `scaleX(${pet.facing})`;
@@ -977,6 +981,7 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
     // ── 입력: 탭=대사/감정, 길게 끌기=잡아서 옮기기(월드 좌표). 펫 위 조작은 배경 스크롤로 안 샘 ──
     let down = null, lastTap = 0, tapCount = 0;
     function handleTap() {
+      if (pet.state === "oneshot") return;  // 감정 재생 중엔 탭 무시(다른 말풍선 안 뜨게)
       const t = now();
       tapCount = (t - lastTap < C.tapWindow) ? tapCount + 1 : 1; lastTap = t;
       if (tapCount >= C.tapsForEmotion) { tapCount = 0; triggerEmotion(); }
@@ -2412,21 +2417,30 @@ function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onClose, petName, pe
   const [motionSrc, setMotionSrc] = useState(petMotion?.stand);
   const [pop, setPop] = useState(false);
   const tapRef = useRef({ last:0, count:0 });
+  const emoting = useRef(false);  // 감정 재생 중 플래그
   const bubbleTimer = useRef(null), popTimer = useRef(null), motionTimer = useRef(null);
   useEffect(() => () => { clearTimeout(bubbleTimer.current); clearTimeout(popTimer.current); clearTimeout(motionTimer.current); }, []);
   const handlePetReact = () => {
+    if (emoting.current) return;  // 감정 재생 중엔 탭 무시(다른 말풍선 안 뜨게)
     const t = Date.now(), r = tapRef.current;
     r.count = (t - r.last < PET_MOTION_CFG.tapWindow) ? r.count + 1 : 1; r.last = t;
+    let bubbleDur = PET_MOTION_CFG.bubbleMs;
     if (r.count >= PET_MOTION_CFG.tapsForEmotion) {
-      r.count = 0;
+      r.count = 0; emoting.current = true;
       const e = PET_EMOTIONS[Math.floor(Math.random()*PET_EMOTIONS.length)];
       setBubble(e.line);
-      setMotionSrc(resolveMotion(e.motion));  // 감정 모션(미보유 키는 stand로) 1회 재생
-      clearTimeout(motionTimer.current); motionTimer.current = setTimeout(() => setMotionSrc(petMotion?.stand), PET_MOTION_CFG.oneShotMs);
+      // 감정 webp 사전 로드 → 있으면 재생, 없으면(로드 실패) stand로 폴백(이모지 안 뜨게)
+      const src = resolveMotion(e.motion);
+      const probe = new Image();
+      probe.onload  = () => setMotionSrc(src);
+      probe.onerror = () => setMotionSrc(petMotion?.stand);
+      probe.src = src;
+      bubbleDur = PET_MOTION_CFG.oneShotMs;    // 말풍선을 감정 모션 길이만큼 유지
+      clearTimeout(motionTimer.current); motionTimer.current = setTimeout(() => { setMotionSrc(petMotion?.stand); emoting.current = false; }, PET_MOTION_CFG.oneShotMs);
     } else {
       setBubble(PET_LINES[Math.floor(Math.random()*PET_LINES.length)]);
     }
-    clearTimeout(bubbleTimer.current); bubbleTimer.current = setTimeout(() => setBubble(null), PET_MOTION_CFG.bubbleMs);
+    clearTimeout(bubbleTimer.current); bubbleTimer.current = setTimeout(() => setBubble(null), bubbleDur);
     setPop(true); clearTimeout(popTimer.current); popTimer.current = setTimeout(() => setPop(false), 240);
   };
 
