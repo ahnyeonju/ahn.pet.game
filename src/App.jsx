@@ -175,6 +175,16 @@ const WEATHER_META = {
   sunset: { label:"노을", emoji:"🌅", bg:"linear-gradient(170deg,#FF7043 0%,#FFA726 50%,#FFE082 100%)" },
 };
 
+// 창문 너머 "바깥" 하늘 그라데이션. 기본 방 창문·상점 창문 유리가 공유.
+const WEATHER_SKY = {
+  sunny:  'linear-gradient(180deg,#5BB8F5 0%,#A8D8F0 55%,#D4EFD0 100%)',
+  rain:   'linear-gradient(180deg,#3D5A66 0%,#6E96A4 100%)',
+  snow:   'linear-gradient(180deg,#9BBFE8 0%,#D9EDF9 100%)',
+  cloudy: 'linear-gradient(180deg,#7A98A4 0%,#C4D4DA 100%)',
+  night:  'linear-gradient(180deg,#08102A 0%,#152040 100%)',
+  sunset: 'linear-gradient(180deg,#C0300A 0%,#F4951A 55%,#FFD870 100%)',
+};
+
 const WEATHER_HOURS    = { nightStart: 20, nightEnd: 6, sunsetStart: 17 };
 const DAILY_EVENT_CHANCE = 0.30;
 const GACHA_RATES      = { superrare: 3, rare: 20 };
@@ -216,7 +226,11 @@ const SHOP_MASTER = [
 
   // ── window ───────────────────────────────────────────────
   // decoration과 동일하게 방에 배치되지만 벽(상단) 영역에만 놓인다.
-  { id:"win_001", name:"동그란 창문", category:"window", price:10, imagePath:"/images/shop/windows/win_001.png", description:"벽에 다는 아늑한 동그란 창문이에요." },
+  // weatherMask: 유리 모양 알파 마스크 PNG(창문 PNG와 같은 해상도). 불투명 영역만 하늘이 비침 → 곡선 창도 지원.
+  { id:"win_001", name:"동그란 창문", category:"window", price:10, imagePath:"/images/shop/windows/win_001.png", description:"벽에 다는 아늑한 동그란 창문이에요.",
+    weatherMask:"/images/shop/windows/win_001_mask.png" },
+  { id:"win_002", name:"하트 창문", category:"window", price:10, imagePath:"/images/shop/windows/win_002.png", description:"벽에 다는 하트 창문이에요.",
+    weatherMask:"/images/shop/windows/win_002_mask.png" },
 
   // ── gift_item ── 뽑기 선물(GIFT_MASTER)을 파생 주입. 구매 즉시 inv.gifts에 인스턴스 추가(handleShopBuy).
   ...GIFT_SHOP_ITEMS,
@@ -233,6 +247,9 @@ const CATEGORY_FALLBACK = {
 
 // 방에 오버레이로 배치되고 "장식" 탭에 함께 표시되는 카테고리
 const DECOR_CATEGORIES = ["decoration", "window"];
+// 카테고리별 1회 구매 시 지급되는 개수. 창문은 묶음 6개, 장식품은 1개씩 무한 구매.
+// 보유 개수만큼 같은 종류를 방에 여러 개 배치할 수 있다(placedDecos).
+const PURCHASE_QTY = { window: 6, decoration: 1 };
 // 카테고리별 방 배치 y 범위(%)와 기본 배치 y. 창문은 벽(상단)에만 놓인다.
 const PLACEMENT_BOUNDS = {
   decoration: { minY: 5, maxY: 95, defY: 50 },
@@ -333,9 +350,30 @@ const DEFAULT_DAILY = {
 const DEFAULT_INV = {
   gifts:[], tickets:INITIAL_TICKETS, currency:0, unlockedPets:[],
   shopItems: { bg_default: { owned:true, equipped:true } },
+  placedDecos: [],  // 방에 배치된 데코/창문 인스턴스 [{ iid, itemId, position:{x,y}, isFixed }]
 };
 
 const loadState = () => { try { const r=localStorage.getItem("tama_v2"); return r?JSON.parse(r):null; } catch{return null;} };
+
+// 불러온 inv를 현재 스키마로 정규화. 구버전(shopItems에 position을 들고 있던 단일 데코)을
+// placedDecos 인스턴스 + count 보유 모델로 이주한다. 신규 세이브는 변경 없이 통과.
+const normalizeInv = (raw) => {
+  const inv = { ...DEFAULT_INV, ...raw };
+  inv.placedDecos = Array.isArray(inv.placedDecos) ? [...inv.placedDecos] : [];
+  const shop = { ...inv.shopItems };
+  Object.entries(shop).forEach(([id, s]) => {
+    const m = SHOP_MASTER.find(x => x.id === id);
+    if (!m || !DECOR_CATEGORIES.includes(m.category)) return;
+    if (s.count == null) {  // 구스키마: count 없음 → 이주
+      if (s.equipped && s.position) {
+        inv.placedDecos.push({ iid:`${id}_mig`, itemId:id, position:s.position, isFixed:s.isFixed ?? false });
+      }
+      shop[id] = { owned:true, count: PURCHASE_QTY[m.category] ?? 1 };
+    }
+  });
+  inv.shopItems = shop;
+  return inv;
+};
 const saveState = s => { try { localStorage.setItem("tama_v2",JSON.stringify(s)); } catch{} };
 
 // ===================================================
@@ -379,7 +417,7 @@ export default function App() {
   const [egg,    setEgg]    = useState(saved?.egg   || null);
   const [pet,    setPet]    = useState(saved?.pet   || DEFAULT_PET);
   const [daily,  setDaily]  = useState(saved?.daily || DEFAULT_DAILY);
-  const [inv,    setInv]    = useState(saved?.inv ? { ...DEFAULT_INV, ...saved.inv } : DEFAULT_INV);
+  const [inv,    setInv]    = useState(saved?.inv ? normalizeInv(saved.inv) : DEFAULT_INV);
   const [ghist,  setGhist]  = useState(saved?.ghist || []);
   const [popup,  setPopup]  = useState(null);
   const [evoData,setEvoData]= useState(null);
@@ -510,7 +548,8 @@ export default function App() {
     const item = SHOP_MASTER.find(i => i.id === itemId);
     if (!item || item.isDefault) return;
     const si = inv.shopItems[itemId];
-    if (si?.owned) { showToast("이미 보유한 상품이에요.", "warn"); return; }
+    const stackable = DECOR_CATEGORIES.includes(item.category);  // 창문·장식품은 재구매로 수량 누적
+    if (si?.owned && !stackable) { showToast("이미 보유한 상품이에요.", "warn"); return; }
     if (inv.currency < item.price) { showToast("재화가 부족해요!", "warn"); return; }
 
     if (item.category === "gift_item") {
@@ -519,12 +558,18 @@ export default function App() {
       if (!ref) return;
       const instance = { ...ref, instanceId: `${ref.id}_${Date.now()}`, traitValue: ref.val };
       setInv(i => ({ ...i, currency: i.currency - item.price, gifts: [...i.gifts, instance] }));
+    } else if (stackable) {
+      // decoration / window — count 누적(창문 +6, 장식품 +1). 배치는 꾸미기 모드에서.
+      const qty = PURCHASE_QTY[item.category] ?? 1;
+      setInv(i => {
+        const count = (i.shopItems[itemId]?.count || 0) + qty;
+        return { ...i, currency: i.currency - item.price, shopItems: { ...i.shopItems, [itemId]: { owned:true, count } } };
+      });
+      showToast(`💰 -${item.price}  「${item.name}」 ${qty}개 구매 완료!`);
+      return;
     } else {
-      // background / decoration / window — shopItems에 owned 기록
-      const initItem = DECOR_CATEGORIES.includes(item.category)
-        ? { owned:true, equipped:false, isFixed:false, position:{ x:50, y:placementBounds(item.category).defY } }
-        : { owned:true, equipped:false };
-      setInv(i => ({ ...i, currency: i.currency - item.price, shopItems: { ...i.shopItems, [itemId]: initItem } }));
+      // background — owned/equipped 1개
+      setInv(i => ({ ...i, currency: i.currency - item.price, shopItems: { ...i.shopItems, [itemId]: { owned:true, equipped:false } } }));
     }
     showToast(`💰 -${item.price}  「${item.name}」 구매 완료!`);
   };
@@ -553,7 +598,7 @@ export default function App() {
     });
   };
 
-  // 꾸미기 완료 시 draft 상태를 inv에 반영
+  // 꾸미기 완료 시 draft 상태를 inv에 반영. draftDecos는 iid 키의 인스턴스 맵.
   const handleDecorSave = (draftBg, draftDecos) => {
     setInv(i => {
       const next = { ...i.shopItems };
@@ -565,14 +610,11 @@ export default function App() {
       if (draftBg === "bg_default") next["bg_default"] = { owned: true, equipped: true };
       else if (draftBg && next[draftBg]) next[draftBg] = { ...next[draftBg], equipped: true };
       else next["bg_default"] = { owned: true, equipped: true };
-      // 장식품/창문 — 기존 equipped 전부 해제 후 draft 적용
-      SHOP_MASTER.filter(m => DECOR_CATEGORIES.includes(m.category)).forEach(m => {
-        if (next[m.id]) next[m.id] = { ...next[m.id], equipped: false };
-      });
-      Object.entries(draftDecos).forEach(([id, state]) => {
-        if (next[id]) next[id] = { ...next[id], ...state, equipped: true };
-      });
-      return { ...i, shopItems: next };
+      // 장식품/창문 — draft 인스턴스 맵을 placedDecos 배열로 저장(보유 count는 그대로)
+      const placedDecos = Object.entries(draftDecos).map(([iid, s]) => ({
+        iid, itemId: s.itemId, position: s.position, isFixed: s.isFixed ?? false,
+      }));
+      return { ...i, shopItems: next, placedDecos };
     });
   };
   // ─────────────────────────────────────────────────────────
@@ -627,7 +669,7 @@ export default function App() {
       setEgg(data.egg);
       setPet(data.pet);
       setDaily(data.daily);
-      setInv(data.inv);
+      setInv(normalizeInv(data.inv));
       setGhist(data.ghist || []);
       saveState({ egg:data.egg, pet:data.pet, daily:data.daily, inv:data.inv, ghist:data.ghist||[] });
       setPopup(null);
@@ -659,7 +701,6 @@ export default function App() {
     <>
       <style>{CSS}</style>
       <div className="shell" style={{ background: (screen!=="home" && screen!=="egg_select") ? `linear-gradient(rgba(17,17,25,.45),rgba(17,17,25,.45)),${wm.bg}` : wm.bg, transition:"background 1.2s ease" }}>
-        <WeatherFX weather={weather}/>
         {toast && <Toast {...toast}/>}
 
         {screen==="egg_select" && <EggSelect onSelect={handleEggSelect}/>}
@@ -716,24 +757,49 @@ export default function App() {
 }
 
 // ===================================================
-// 날씨 FX
+// 날씨 FX — 전체 화면 기준 파티클. 부모가 overflow:hidden이면 그 영역에만 클립됨.
 // ===================================================
 function WeatherFX({ weather }) {
   if (weather==="snow") return (
-    <div style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden",zIndex:1}}>
+    <div style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden"}}>
       {[...Array(16)].map((_,i)=>(
         <div key={i} style={{position:"absolute",top:-10,left:`${5+i*6}%`,width:6,height:6,borderRadius:"50%",background:"rgba(255,255,255,.85)",animation:`snowfall ${2+i*.2}s linear ${i*.18}s infinite`}}/>
       ))}
     </div>
   );
   if (weather==="rain") return (
-    <div style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden",zIndex:1}}>
+    <div style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden"}}>
       {[...Array(22)].map((_,i)=>(
         <div key={i} style={{position:"absolute",top:-10,left:`${i*4.5}%`,width:1.5,height:16,background:"rgba(180,220,255,.55)",animation:`rainfall ${.55+i*.03}s linear ${i*.06}s infinite`}}/>
       ))}
     </div>
   );
   return null;
+}
+
+// 창문 유리 너머 "바깥" — 벽(배경)을 뚫고 하늘 + 날씨를 보여줌. 유리 모양은 알파 마스크 PNG로 클립(곡선 지원).
+// 날씨 파티클 필드는 컨테이너(방) 좌표에 정렬(fieldX/Y/W/H) → 모든 창문이 같은 하나의 하늘을 공유
+// (창문별 독립 파티클이 아니라 한 하늘의 다른 부분을 들여다봄). 프레임 PNG가 위(zIndex 1)에서 덮음.
+function WindowOutside({ weather, mask, fieldX, fieldY, fieldW, fieldH }) {
+  const sky = WEATHER_SKY[weather] || WEATHER_SKY.sunny;
+  // 마스크는 창문 PNG와 같은 영역(inset:0)을 덮고 100% 100%로 정렬. 불투명 픽셀에서만 하늘이 보임.
+  const maskStyle = {
+    WebkitMaskImage:`url(${mask})`, maskImage:`url(${mask})`,
+    WebkitMaskSize:"100% 100%", maskSize:"100% 100%",
+    WebkitMaskRepeat:"no-repeat", maskRepeat:"no-repeat",
+  };
+  return (
+    <div style={{position:"absolute",inset:0,zIndex:0,pointerEvents:"none",overflow:"hidden",...maskStyle}}>
+      {fieldW>0 ? (
+        // 그라데이션·파티클 모두 방 컨테이너 좌표(필드)에 정렬 → 모든 창문이 하나의 연속된 하늘 공유
+        <div style={{position:"absolute",left:fieldX,top:fieldY,width:fieldW,height:fieldH,background:sky}}>
+          <WeatherFX weather={weather}/>
+        </div>
+      ) : (
+        <div style={{position:"absolute",inset:0,background:sky}}/>
+      )}
+    </div>
+  );
 }
 
 // ===================================================
@@ -1010,7 +1076,7 @@ function EggSelect({ onSelect }) {
 // ===================================================
 // 홈 꾸미기 모드 장식품 오버레이
 // isFixed=false: 드래그 가능 / isFixed=true: 위치 고정
-function DecorationOverlay({ item, itemState, containerRef, draggable, onFixToggle, onRemove, onMove, onDragStart, scrollX = 0 }) {
+function DecorationOverlay({ item, itemState, containerRef, draggable, onFixToggle, onRemove, onMove, onDragStart, scrollX = 0, weather }) {
   const [localPos, setLocalPos] = useState(itemState.position);
   const dragRef = useRef({ active:false, startX:0, startY:0, startPos:{x:0,y:0} });
 
@@ -1066,6 +1132,15 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, onFixTogg
 
   const fixed = itemState.isFixed;
 
+  // 창문: 날씨 필드를 컨테이너(방) 좌표에 정렬 → 모든 창문이 같은 하늘을 공유(개별 파티클 X).
+  // 마스크는 창문 래퍼(inset:0)를 덮으므로, 래퍼 좌상단을 컨테이너 px로 구해 그만큼 필드를 음수 오프셋한다.
+  let outside = null;
+  if (item.category==="window" && item.weatherMask && box.w && dispW) {
+    const wrapLeft = (localPos.x/100)*box.w - scrollX - dispW/2;  // 래퍼 좌상단 x (컨테이너 px)
+    const wrapTop  = (localPos.y/100)*box.h - dispH/2;            // 래퍼 좌상단 y
+    outside = { mask:item.weatherMask, fieldX:-wrapLeft, fieldY:-wrapTop, fieldW:box.w, fieldH:box.h };
+  }
+
   return (
     // 비꾸미기 모드: pointerEvents none으로 배경 드래그 이벤트를 가로채지 않음
     <div
@@ -1081,11 +1156,13 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, onFixTogg
       }}
     >
       <div style={{position:"relative"}}>
+        {/* 창문: 프레임 PNG 뒤(zIndex 0)에 유리 클립 날씨 → 프레임이 위(zIndex 1)에서 덮음 */}
+        {outside && <WindowOutside weather={weather} {...outside}/>}
         {item.imagePath && !imgFailed ? (
           <img src={item.imagePath} alt="" draggable={false}
             onError={() => setImgFailed(true)}
             onLoad={e => setNatural({ w:e.target.naturalWidth, h:e.target.naturalHeight })}
-            style={{ width: dispW ?? 60, height:"auto", display:"block", pointerEvents:"none" }}/>
+            style={{ width: dispW ?? 60, height:"auto", display:"block", pointerEvents:"none", position:"relative", zIndex:1 }}/>
         ) : (
           <span style={{ fontSize: Math.round((dispW ?? 60) * 0.62), lineHeight:1 }}>
             {CATEGORY_FALLBACK[item.category] || "🛍️"}
@@ -1138,16 +1215,16 @@ function HomeLayout({
   // ── 꾸미기 draft 상태 ────────────────────────────────────
   const [isDecorMode, setIsDecorMode]         = useState(false);
   const [draftBg, setDraftBg]                 = useState(null);       // equipped background id
-  const [draftDecos, setDraftDecos]           = useState({});          // {[id]: {isFixed, position}}
+  const [draftDecos, setDraftDecos]           = useState({});          // {[iid]: {itemId, isFixed, position}}
   const [isDecorPanelOpen, setIsDecorPanelOpen] = useState(true);
   const [isDraggingDecor, setIsDraggingDecor] = useState(false);
+  const iidRef = useRef(0);  // 새 배치 인스턴스 iid 생성용 카운터
 
   const enterDecorMode = () => {
     const currentBg = (SHOP_MASTER.find(i => i.category==="background" && inv.shopItems?.[i.id]?.equipped) || {id:"bg_default"}).id;
     const initDecos = {};
-    SHOP_MASTER.filter(i => DECOR_CATEGORIES.includes(i.category) && inv.shopItems?.[i.id]?.equipped).forEach(item => {
-      const si = inv.shopItems[item.id];
-      initDecos[item.id] = { isFixed: si.isFixed ?? false, position: si.position ?? { x:50, y:placementBounds(item.category).defY } };
+    (inv.placedDecos || []).forEach(p => {
+      initDecos[p.iid] = { itemId: p.itemId, isFixed: p.isFixed ?? false, position: p.position };
     });
     setDraftBg(currentBg);
     setDraftDecos(initDecos);
@@ -1167,32 +1244,38 @@ function HomeLayout({
     setDraftDecos({});
   };
 
-  // draft 장식품 핸들러
-  const handleDraftFixToggle = (itemId) => {
-    setDraftDecos(prev => ({ ...prev, [itemId]: { ...prev[itemId], isFixed: !prev[itemId].isFixed } }));
+  // draft 장식품 핸들러 — iid(인스턴스) 단위
+  const handleDraftFixToggle = (iid) => {
+    setDraftDecos(prev => ({ ...prev, [iid]: { ...prev[iid], isFixed: !prev[iid].isFixed } }));
   };
-  const handleDraftRemove = (itemId) => {
-    setDraftDecos(prev => { const n={...prev}; delete n[itemId]; return n; });
+  const handleDraftRemove = (iid) => {
+    setDraftDecos(prev => { const n={...prev}; delete n[iid]; return n; });
   };
-  const handleDraftMove = (itemId, pos) => {
-    setDraftDecos(prev => ({ ...prev, [itemId]: { ...prev[itemId], position: pos } }));
+  const handleDraftMove = (iid, pos) => {
+    setDraftDecos(prev => ({ ...prev, [iid]: { ...prev[iid], position: pos } }));
   };
   const handleDraftAdd = (itemId) => {
-    if (draftDecos[itemId]) return; // 이미 배치됨
     const cat = SHOP_MASTER.find(i => i.id === itemId)?.category;
+    if (!cat) return;
+    const owned  = inv.shopItems?.[itemId]?.count || 0;
+    const placed = Object.values(draftDecos).filter(s => s.itemId === itemId).length;
+    if (placed >= owned) return;  // 보유 개수만큼만 배치
     const w = midRef.current?.offsetWidth || 0;  // 현재 보이는 화면 중앙(월드 x%)에 생성
     const x = w ? Math.max(DECOR_X.min, Math.min(DECOR_X.max, ((scrollX + w / 2) / w) * 100)) : 50;
-    setDraftDecos(prev => ({ ...prev, [itemId]: { isFixed: false, position: { x, y:placementBounds(cat).defY } } }));
+    const iid = `${itemId}_${Date.now()}_${iidRef.current++}`;
+    setDraftDecos(prev => ({ ...prev, [iid]: { itemId, isFixed: false, position: { x, y:placementBounds(cat).defY } } }));
   };
 
-  // 렌더에 사용할 배경/장식품 (꾸미기 모드면 draft, 아니면 실제 inv)
+  // 렌더에 사용할 배경 (꾸미기 모드면 draft, 아니면 실제 inv)
   const displayBg = isDecorMode
     ? SHOP_MASTER.find(i => i.id === draftBg) || null
     : SHOP_MASTER.find(i => i.category==="background" && inv.shopItems?.[i.id]?.equipped) || null;
 
-  const displayDecos = isDecorMode
-    ? SHOP_MASTER.filter(i => DECOR_CATEGORIES.includes(i.category) && draftDecos[i.id])
-    : SHOP_MASTER.filter(i => DECOR_CATEGORIES.includes(i.category) && inv.shopItems?.[i.id]?.equipped);
+  // 배치된 데코/창문 인스턴스 리스트 [{ iid, item, state }]
+  const displayDecos = (isDecorMode
+    ? Object.entries(draftDecos).map(([iid, s]) => ({ iid, item: SHOP_MASTER.find(m => m.id === s.itemId), state: s }))
+    : (inv.placedDecos || []).map(p => ({ iid: p.iid, item: SHOP_MASTER.find(m => m.id === p.itemId), state: p }))
+  ).filter(d => d.item);
 
   const [scrollX, setScrollX] = useState(0);
   const scrollXRef = useRef(0);  // rAF(펫)에서 실시간 scrollX 읽기용
@@ -1243,19 +1326,20 @@ function HomeLayout({
       >
         <RoomBackground weather={weather} scrollX={scrollX} equippedBg={displayBg}/>
 
-        {/* 장식품 오버레이 — 꾸미기 모드: draft 기준, 일반: inv 기준 */}
-        {displayDecos.map(item => (
+        {/* 장식품 오버레이 — 꾸미기 모드: draft 기준, 일반: inv 기준. 인스턴스(iid)마다 1개 렌더 */}
+        {displayDecos.map(({ iid, item, state }) => (
           <DecorationOverlay
-            key={item.id}
+            key={iid}
             item={item}
-            itemState={isDecorMode ? draftDecos[item.id] : inv.shopItems[item.id]}
+            itemState={state}
             containerRef={midRef}
             draggable={isDecorMode}
-            onFixToggle={isDecorMode ? () => handleDraftFixToggle(item.id) : undefined}
-            onRemove={isDecorMode ? () => handleDraftRemove(item.id) : undefined}
-            onMove={isDecorMode ? pos => handleDraftMove(item.id, pos) : undefined}
+            onFixToggle={isDecorMode ? () => handleDraftFixToggle(iid) : undefined}
+            onRemove={isDecorMode ? () => handleDraftRemove(iid) : undefined}
+            onMove={isDecorMode ? pos => handleDraftMove(iid, pos) : undefined}
             onDragStart={isDecorMode ? () => { setIsDraggingDecor(true); setIsDecorPanelOpen(false); } : undefined}
             scrollX={scrollX}
+            weather={weather}
           />
         ))}
 
@@ -1332,10 +1416,7 @@ function HomeLayout({
             isOpen={isDecorPanelOpen && !isDraggingDecor}
             onToggle={() => { setIsDecorPanelOpen(o=>!o); setIsDraggingDecor(false); }}
             onBgSelect={(id) => setDraftBg(id)}
-            onDecoToggle={(id) => {
-              if (draftDecos[id]) handleDraftRemove(id);
-              else handleDraftAdd(id);
-            }}
+            onDecoAdd={(id) => handleDraftAdd(id)}
           />
         )}
       </div>
@@ -1349,6 +1430,16 @@ function HomeLayout({
 // 방 배경 (가로 3배, 슬라이드 가능)
 // ===================================================
 function RoomBackground({ weather, scrollX, equippedBg }) {
+  // 뷰포트 px 측정 — 기본 창문들이 같은 하늘(뷰포트 좌표 정렬 날씨 필드)을 공유하기 위함
+  const vpRef = useRef(null);
+  const [vp, setVp] = useState({ w:0, h:0 });
+  useEffect(() => {
+    const measure = () => setVp({ w: vpRef.current?.offsetWidth || 0, h: vpRef.current?.offsetHeight || 0 });
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
   // 커스텀 배경 이미지가 장착된 경우 이미지로 대체
   if (equippedBg?.imagePath) {
     return (
@@ -1360,22 +1451,14 @@ function RoomBackground({ weather, scrollX, equippedBg }) {
       </div>
     );
   }
-  const skies = {
-    sunny:  { bg:'linear-gradient(180deg,#5BB8F5 0%,#A8D8F0 55%,#D4EFD0 100%)', icon:'☀️' },
-    rain:   { bg:'linear-gradient(180deg,#3D5A66 0%,#6E96A4 100%)',              icon:'🌧️' },
-    snow:   { bg:'linear-gradient(180deg,#9BBFE8 0%,#D9EDF9 100%)',              icon:'❄️' },
-    cloudy: { bg:'linear-gradient(180deg,#7A98A4 0%,#C4D4DA 100%)',              icon:'☁️' },
-    night:  { bg:'linear-gradient(180deg,#08102A 0%,#152040 100%)',              icon:'🌙' },
-    sunset: { bg:'linear-gradient(180deg,#C0300A 0%,#F4951A 55%,#FFD870 100%)', icon:'🌅' },
-  };
-  const sky = skies[weather] || skies.sunny;
+  const skyBg = WEATHER_SKY[weather] || WEATHER_SKY.sunny;
 
   // 창문 6개: 배경(3x width)에서 0.25W, 0.75W, 1.25W, 1.75W, 2.25W, 2.75W 위치
   // 3x 기준 % → 8.33%, 25%, 41.67%, 58.33%, 75%, 91.67%
   const winLeft = ['8.33%','25%','41.67%','58.33%','75%','91.67%'];
 
   return (
-    <div style={{position:'absolute',inset:0,overflow:'hidden',zIndex:0}}>
+    <div ref={vpRef} style={{position:'absolute',inset:0,overflow:'hidden',zIndex:0}}>
       <div style={{
         position:'absolute', top:0, bottom:0, left:0,
         width:'300%',
@@ -1389,7 +1472,12 @@ function RoomBackground({ weather, scrollX, equippedBg }) {
         }}/>
 
         {/* 창문들 */}
-        {winLeft.map((left, i) => (
+        {winLeft.map((left, i) => {
+          // 유리 좌상단을 뷰포트 px로 환산 → 날씨 필드를 그만큼 음수 오프셋해 모든 창문이 한 하늘을 공유.
+          // 배경 이동 div는 300%(=3*vp.w) 폭이며 translateX(-scrollX)로 스크롤됨. padding 4px만큼 유리가 안쪽.
+          const glassLeft = (parseFloat(left)/100)*(3*vp.w) - 65 + 4 - scrollX;
+          const glassTop  = 0.06*vp.h + 4;
+          return (
           <div key={i} style={{
             position:'absolute', left:`calc(${left} - 65px)`, top:'6%',
             width:130, height:185,
@@ -1401,17 +1489,24 @@ function RoomBackground({ weather, scrollX, equippedBg }) {
             {/* 창문 유리 (이모티콘 없이 하늘색만) */}
             <div style={{
               width:'100%', height:'100%',
-              background:sky.bg,
+              background:skyBg,
               borderRadius:3,
               overflow:'hidden', position:'relative',
             }}>
+              {/* 유리 안 날씨 — 뷰포트 좌표 정렬 필드(한 하늘 공유). overflow:hidden으로 유리에만 클립 */}
+              {vp.w>0 ? (
+                <div style={{position:'absolute',left:-glassLeft,top:-glassTop,width:vp.w,height:vp.h}}>
+                  <WeatherFX weather={weather}/>
+                </div>
+              ) : <WeatherFX weather={weather}/>}
               {/* 창틀 세로 */}
               <div style={{position:'absolute',top:0,left:'50%',width:3,height:'100%',background:'rgba(80,40,8,0.75)',transform:'translateX(-50%)',zIndex:1}}/>
               {/* 창틀 가로 */}
               <div style={{position:'absolute',top:'42%',left:0,width:'100%',height:3,background:'rgba(80,40,8,0.75)',transform:'translateY(-50%)',zIndex:1}}/>
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {/* 걸레받이 */}
         <div style={{
@@ -1929,11 +2024,15 @@ function ShopItemImage({ item, size=64 }) {
 // ===================================================
 // 꾸미기 모드 하단 패널 (홈에서만 사용)
 // ===================================================
-function DecorateModePanel({ inv, draftBg, draftDecos, isOpen, onToggle, onBgSelect, onDecoToggle }) {
+function DecorateModePanel({ inv, draftBg, draftDecos, isOpen, onToggle, onBgSelect, onDecoAdd }) {
   const ownedBgs   = SHOP_MASTER.filter(i => i.category === "background" && (inv.shopItems?.[i.id]?.owned || i.isDefault));
-  const ownedDecos = SHOP_MASTER.filter(i => DECOR_CATEGORIES.includes(i.category) && inv.shopItems?.[i.id]?.owned);
+  const ownedDecos = SHOP_MASTER.filter(i => DECOR_CATEGORIES.includes(i.category) && (inv.shopItems?.[i.id]?.count || 0) > 0);
+  // 종류별 현재 배치된(draft) 인스턴스 수 — 잔여 개수 표시용
+  const placedCount = {};
+  Object.values(draftDecos).forEach(s => { placedCount[s.itemId] = (placedCount[s.itemId] || 0) + 1; });
 
-  const Tile = ({ item, active, onTap }) => (
+  // 배경 타일 — 선택 토글
+  const BgTile = ({ item, active, onTap }) => (
     <div onClick={onTap}
       style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,
         padding:"8px 6px",borderRadius:14,cursor:"pointer",minWidth:68,
@@ -1955,6 +2054,35 @@ function DecorateModePanel({ inv, draftBg, draftDecos, isOpen, onToggle, onBgSel
       )}
     </div>
   );
+
+  // 데코/창문 타일 — 탭하면 1개씩 추가. 잔여(보유−배치)가 0이면 비활성.
+  const DecoTile = ({ item }) => {
+    const owned = inv.shopItems?.[item.id]?.count || 0;
+    const placed = placedCount[item.id] || 0;
+    const remain = owned - placed;
+    const disabled = remain <= 0;
+    return (
+      <div onClick={disabled ? undefined : () => onDecoAdd(item.id)}
+        style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,
+          padding:"8px 6px",borderRadius:14,cursor:disabled?"default":"pointer",minWidth:68,
+          opacity:disabled?0.45:1,
+          background:placed>0?"rgba(255,255,255,.18)":"rgba(255,255,255,.08)",
+          border:`1.5px solid ${placed>0?"rgba(255,255,255,.4)":"rgba(255,255,255,.15)"}`}}>
+        <div style={{width:48,height:48,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <ShopItemImage item={item} size={44}/>
+        </div>
+        <div style={{fontSize:10,color:"#fff",fontFamily:"'Jua',sans-serif",textAlign:"center",
+          wordBreak:"keep-all",maxWidth:64,overflow:"hidden",
+          display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
+          {item.name}
+        </div>
+        <div style={{fontSize:9,background:"rgba(0,0,0,.3)",borderRadius:6,
+          padding:"2px 6px",color:disabled?"#FF9B9B":"#7FFFD4",fontWeight:800}}>
+          {disabled ? "다 놓음" : `+추가 ${remain}/${owned}`}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:Z_UI.decorCtrl}}>
@@ -1980,7 +2108,7 @@ function DecorateModePanel({ inv, draftBg, draftDecos, isOpen, onToggle, onBgSel
                 marginBottom:8,letterSpacing:1}}>배경</div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 {ownedBgs.map(item => (
-                  <Tile key={item.id} item={item}
+                  <BgTile key={item.id} item={item}
                     active={draftBg === item.id}
                     onTap={() => onBgSelect(item.id)}/>
                 ))}
@@ -1999,9 +2127,7 @@ function DecorateModePanel({ inv, draftBg, draftDecos, isOpen, onToggle, onBgSel
             ) : (
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 {ownedDecos.map(item => (
-                  <Tile key={item.id} item={item}
-                    active={!!draftDecos[item.id]}
-                    onTap={() => onDecoToggle(item.id)}/>
+                  <DecoTile key={item.id} item={item}/>
                 ))}
               </div>
             )}
@@ -2016,6 +2142,9 @@ function ShopDetailPopup({ item, inv, onBuy, onClose }) {
   const si = inv.shopItems?.[item.id];
   const owned = si?.owned || item.isDefault;
   const canAfford = inv.currency >= item.price;
+  const stackable = DECOR_CATEGORIES.includes(item.category);  // 창문·장식품: 재구매로 수량 누적
+  const count = si?.count || 0;
+  const showBuy = !item.isDefault && (stackable || !owned);   // 스택 아이템은 항상 구매 가능
 
   return (
     <div
@@ -2055,23 +2184,26 @@ function ShopDetailPopup({ item, inv, onBuy, onClose }) {
         {item.isDefault && (
           <div style={{fontSize:13,color:"rgba(255,255,255,.4)"}}>기본 제공</div>
         )}
-        {!item.isDefault && owned && (
+        {stackable && count > 0 && (
+          <div style={{fontSize:13,fontWeight:800,color:"rgba(80,220,120,.9)"}}>✓ 보유 {count}개</div>
+        )}
+        {!item.isDefault && !stackable && owned && (
           <div style={{fontSize:13,fontWeight:800,color:"rgba(80,220,120,.9)"}}>✓ 보유 중</div>
         )}
-        {!item.isDefault && !owned && (
+        {showBuy && (
           <div style={{fontSize:14,fontWeight:800,color:canAfford?"#FFD700":"#FF6B6B"}}>
             💰 {item.price}{!canAfford && "  (재화 부족)"}
           </div>
         )}
 
-        {/* 미보유 시에만 구매 버튼 */}
-        {!owned && !item.isDefault && (
+        {/* 구매 버튼 — 스택 아이템은 보유 중에도 노출(재구매) */}
+        {showBuy && (
           <button onClick={()=>{ onBuy(item.id); onClose(); }} disabled={!canAfford}
             style={{width:"100%",maxWidth:280,padding:"12px 0",borderRadius:14,border:"none",
               cursor:canAfford?"pointer":"not-allowed",
               background:canAfford?"linear-gradient(135deg,#F7971E,#FFD200)":"rgba(255,255,255,.1)",
               color:"#fff",fontWeight:800,fontSize:15,fontFamily:"'Nunito',sans-serif"}}>
-            {canAfford?"구매하기":"재화가 부족해요"}
+            {canAfford?(stackable && count>0 ? "더 구매하기" : "구매하기"):"재화가 부족해요"}
           </button>
         )}
       </div>
@@ -2192,10 +2324,13 @@ function Shop({ inv, onBuy, onBack }) {
               const si      = inv.shopItems?.[item.id];
               const owned   = si?.owned || item.isDefault;
               const canAfford = inv.currency >= item.price;
+              const stackable = DECOR_CATEGORIES.includes(item.category);  // 창문·장식품: 재구매 가능
+              const count   = si?.count || 0;
+              const has     = item.isDefault || (stackable ? count > 0 : owned);
               return (
                 <div key={item.id} onClick={()=>setSelectedItem(item)} style={{
-                  background:owned?"rgba(255,255,255,.15)":"rgba(255,255,255,.08)",
-                  border:`1.5px solid ${owned?"rgba(255,255,255,.35)":"rgba(255,255,255,.15)"}`,
+                  background:has?"rgba(255,255,255,.15)":"rgba(255,255,255,.08)",
+                  border:`1.5px solid ${has?"rgba(255,255,255,.35)":"rgba(255,255,255,.15)"}`,
                   borderRadius:18,padding:"14px 10px",display:"flex",flexDirection:"column",
                   alignItems:"center",gap:8,backdropFilter:"blur(8px)",cursor:"pointer"}}>
 
@@ -2210,8 +2345,12 @@ function Shop({ inv, onBuy, onBack }) {
                   </div>
 
                   <div style={{fontSize:11,fontWeight:800,
-                    color:item.isDefault||owned?"rgba(80,220,120,.8)":canAfford?"#FFD700":"#FF6B6B"}}>
-                    {item.isDefault?"기본 제공":owned?"✓ 보유 중":`💰 ${item.price}`}
+                    color:item.isDefault?"rgba(80,220,120,.8)":canAfford?"#FFD700":"#FF6B6B"}}>
+                    {item.isDefault
+                      ? "기본 제공"
+                      : stackable
+                        ? (count>0 ? `보유 ${count} · 💰${item.price}` : `💰 ${item.price}`)
+                        : owned ? "✓ 보유 중" : `💰 ${item.price}`}
                   </div>
                 </div>
               );
