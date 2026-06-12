@@ -836,7 +836,7 @@ function WindowOutside({ weather, mask, fieldX, fieldY, fieldW, fieldH }) {
 function Toast({ msg, type }) {
   const bg = type==="gold"?"linear-gradient(135deg,#F7971E,#FFD200)":type==="warn"?"linear-gradient(135deg,#FF6B6B,#FF8E53)":"linear-gradient(135deg,#43C6AC,#4ECDC4)";
   return (
-    <div style={{position:"absolute",top:56,left:"50%",transform:"translateX(-50%)",background:bg,color:"#fff",padding:"9px 20px",borderRadius:24,fontWeight:800,fontSize:13,zIndex:9999,whiteSpace:"nowrap",boxShadow:"0 4px 20px rgba(0,0,0,.25)",animation:"pop .3s ease"}}>
+    <div style={{position:"absolute",top:56,left:0,right:0,margin:"0 auto",width:"fit-content",maxWidth:"90%",background:bg,color:"#fff",padding:"9px 20px",borderRadius:24,fontWeight:800,fontSize:13,zIndex:9999,whiteSpace:"nowrap",boxShadow:"0 4px 20px rgba(0,0,0,.25)",animation:"pop .3s ease"}}>
       {msg}
     </div>
   );
@@ -2510,7 +2510,10 @@ function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onNewPet, onClose, p
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:16}}>
           <div onClick={handlePetReact} style={{position:"relative",cursor:"pointer",transform:pop?"scale(1.08)":"scale(1)",transition:"transform .18s ease",WebkitTapHighlightColor:"transparent"}}>
             {bubble && (
-              <div style={{position:"absolute",left:"50%",bottom:"104%",transform:"translateX(-50%)",background:"#fff",border:"2px solid #333",borderRadius:12,padding:"5px 10px",fontSize:12,fontWeight:800,color:"#222",whiteSpace:"nowrap",fontFamily:"'Jua',sans-serif",animation:"tooltipIn .2s ease",zIndex:5,pointerEvents:"none"}}>{bubble}</div>
+              // 바깥: translateX(-50%) 정적 중앙 정렬 / 안쪽: tooltipIn 애니(transform 분리 → 우측 드리프트 방지)
+              <div style={{position:"absolute",left:"50%",bottom:"104%",transform:"translateX(-50%)",zIndex:5,pointerEvents:"none"}}>
+                <div style={{background:"#fff",border:"2px solid #333",borderRadius:12,padding:"5px 10px",fontSize:12,fontWeight:800,color:"#222",whiteSpace:"nowrap",fontFamily:"'Jua',sans-serif",animation:"tooltipIn .2s ease"}}>{bubble}</div>
+              </div>
             )}
             <PetSprite size={104} imgSrc={motionSrc} emoji={petEmoji}/>
           </div>
