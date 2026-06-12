@@ -429,6 +429,7 @@ export default function App() {
   const [devMode,    setDevMode]    = useState(false);
   const [devWeather, setDevWeather] = useState(null); // null = 실제 날씨 사용
   const newPetRef = useRef(false);  // "다른 펫 키우기" 진입 시 handleEggSelect가 inv·daily를 보존하도록 표시
+  const [feedTick, setFeedTick] = useState(0);  // 밥 줄 때마다 증가 → 펫이 밥 먹는 연출 트리거
 
   const weather = (import.meta.env.DEV && devWeather) ? devWeather : getWeather();
   const wm = WEATHER_META[weather];
@@ -486,11 +487,19 @@ export default function App() {
   }, [daily, showToast]);
 
   // 액션
-  const handleFeed  = () => { if(devMode){ setPet(p=>({...p,status:{...p.status,hunger:Math.min(100,p.status.hunger+MISSION_REWARDS.feed.statusGain)}})); showToast("🔧 [DEV] 밥 효과 적용"); return; } if(markMissionDone("feed"))  { setPet(p=>({...p,status:{...p.status,hunger:Math.min(100,p.status.hunger+MISSION_REWARDS.feed.statusGain)}})); showToast("🍚 밥을 줬어요! 미션에서 보상을 받으세요."); } };
-  const handleClean = () => { if(devMode){ setPet(p=>({...p,status:{...p.status,cleanness:Math.min(100,p.status.cleanness+MISSION_REWARDS.clean.statusGain)}})); showToast("🔧 [DEV] 청소 효과 적용"); return; } if(markMissionDone("clean")) { setPet(p=>({...p,status:{...p.status,cleanness:Math.min(100,p.status.cleanness+MISSION_REWARDS.clean.statusGain)}})); showToast("🛁 청소했어요! 미션에서 보상을 받으세요."); } };
+  // 액션은 여러 번 실행(상태 회복·모션 매번), 미션 마킹(보상)은 하루 1회.
+  const handleFeed  = () => {
+    setPet(p=>({...p,status:{...p.status,hunger:Math.min(100,p.status.hunger+MISSION_REWARDS.feed.statusGain)}})); setFeedTick(t=>t+1);
+    const first = !devMode && !daily.missions.feed; if(first) markMissionDone("feed");
+    showToast(devMode ? "🔧 [DEV] 밥 효과 적용" : first ? "🍚 밥을 줬어요! 미션에서 보상을 받으세요." : "🍚 냠냠~ 잘 먹었어요!");
+  };
+  const handleClean = () => {
+    setPet(p=>({...p,status:{...p.status,cleanness:Math.min(100,p.status.cleanness+MISSION_REWARDS.clean.statusGain)}}));
+    const first = !devMode && !daily.missions.clean; if(first) markMissionDone("clean");
+    showToast(devMode ? "🔧 [DEV] 청소 효과 적용" : first ? "🛁 청소했어요! 미션에서 보상을 받으세요." : "🛁 깨끗해졌어요!");
+  };
   const handleStatusCheck = () => { if(!devMode && !daily.missions.statusCheck) markMissionDone("statusCheck"); setPopup("status"); };
   const handlePlay = () => {
-    if(!devMode && daily.missions.play){ showToast("이미 완료!", "warn"); return; }
     const a=Math.floor(Math.random()*MINIGAME_CONFIG.numRange)+MINIGAME_CONFIG.numMin, b=Math.floor(Math.random()*MINIGAME_CONFIG.numRange)+MINIGAME_CONFIG.numMin, ans=a*b;
     const wrongs=[]; while(wrongs.length<MINIGAME_CONFIG.wrongCount){ const w=ans+(Math.floor(Math.random()*MINIGAME_CONFIG.wrongRange)-MINIGAME_CONFIG.wrongOffset); if(w!==ans&&w>0&&!wrongs.includes(w)) wrongs.push(w); }
     setGame({ a, b, answer:ans, choices:[ans,...wrongs].sort(()=>Math.random()-.5), done:false });
@@ -499,7 +508,7 @@ export default function App() {
   const handleGameAnswer = choice => {
     if(choice===game.answer){
       setGame(g=>({...g,done:true,correct:true}));
-      setTimeout(()=>{ if(!devMode) markMissionDone("play"); setPet(p=>({...p,status:{...p.status,mood:Math.min(100,p.status.mood+MISSION_REWARDS.play.statusGain)}})); showToast(devMode?"🔧 [DEV] 정답!":"🎮 정답! 미션에서 보상을 받으세요."); setScreen("home"); setGame(null); },900);
+      setTimeout(()=>{ const first = !devMode && !daily.missions.play; if(first) markMissionDone("play"); setPet(p=>({...p,status:{...p.status,mood:Math.min(100,p.status.mood+MISSION_REWARDS.play.statusGain)}})); showToast(devMode?"🔧 [DEV] 정답!":first?"🎮 정답! 미션에서 보상을 받으세요.":"🎮 정답! 잘했어요!"); setScreen("home"); setGame(null); },900);
     } else {
       setGame(g=>({...g,done:true,correct:false}));
       setTimeout(()=>{ showToast("틀렸어요! 다시 도전하세요","warn"); setScreen("home"); setGame(null); },900);
@@ -737,7 +746,7 @@ export default function App() {
             pet={pet} daily={daily} inv={inv} weather={weather} wm={wm}
             growthPct={growthPct} growthMax={growthMax} missionDone={missionDone}
             getPetEmoji={getPetEmoji} getPetName={getPetName} getPetImg={getPetImg} getPetMotion={getPetMotion}
-            canEvolve={canEvolve}
+            canEvolve={canEvolve} feedSignal={feedTick}
             onFeed={handleFeed} onPlay={handlePlay} onClean={handleClean}
             onGiftNav={()=>setScreen("giftbox")} onStatusCheck={handleStatusCheck}
             onNav={setScreen} onShare={handleShare} onSettings={()=>setPopup("settings")} onEventClaim={handleEventReward}
@@ -881,6 +890,7 @@ const PET_MOTION_CFG = {
   idleMin: 3000, idleMax: 8000,
   longRestEvery: 3, longRestMs: 12000,
   standAfterDrop: 2000, oneShotMs: 3000, bubbleMs: 1800,  // oneShotMs: 감정 모션 재생 시간(webp 1루프 ~1.1s → 약 2~3회 반복)
+  feedMs: 5000,  // 밥 먹는 연출(밥 이미지 옆에 표시 + 멈춤) 지속 시간
   tapWindow: 1200, tapsForEmotion: 3, dragThresh: 8,
   floorTopPct: 0.64, floorBottomPct: 0.97,  // 펫 발이 머무는 마루 밴드(컨테이너 높이 대비)
 };
@@ -893,7 +903,7 @@ const PET_EMOTIONS = [
 ];
 
 // 모션 에셋 유무를 확인해 wandering / 정적 fallback 결정
-function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji, petName, petColor }) {
+function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji, petName, petColor, feedSignal }) {
   const [ready, setReady] = useState(null); // null=확인중, true=모션, false=정적fallback
   useEffect(() => {
     if (!motion?.stand || !motion?.walk) { setReady(false); return; }
@@ -917,11 +927,13 @@ function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji
       </div>
     );
   }
-  return <WanderingPetActive containerRef={containerRef} scrollXRef={scrollXRef} motion={motion} petName={petName} petColor={petColor}/>;
+  return <WanderingPetActive containerRef={containerRef} scrollXRef={scrollXRef} motion={motion} petName={petName} petColor={petColor} feedSignal={feedSignal}/>;
 }
 
-function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColor }) {
-  const wrapRef = useRef(null), imgRef = useRef(null), bubbleRef = useRef(null), bubbleTextRef = useRef(null);
+function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColor, feedSignal }) {
+  const wrapRef = useRef(null), imgRef = useRef(null), bubbleRef = useRef(null), bubbleTextRef = useRef(null), foodRef = useRef(null);
+  const feedSignalRef = useRef(feedSignal);
+  useEffect(() => { feedSignalRef.current = feedSignal; }, [feedSignal]);  // 밥 신호를 루프가 ref로 읽음(루프 재시작 방지)
 
   useEffect(() => {
     const container = containerRef.current;
@@ -939,12 +951,14 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
     const pet = { x: 0, y: 0, facing: 1, state: "idle", oneShotMotion: null };
     let home = { x: 0, y: 0 }, target = null;
     let walkUntil = 0, walkCount = 0, idleUntil = 0, motionUntil = 0, bubbleUntil = 0, curSrc = "";
+    let eatUntil = 0, seenFeed = feedSignalRef.current;  // 밥 먹는 연출 종료시각 / 마지막으로 처리한 밥 신호
 
     function resize() {
       W = container.clientWidth; H = container.clientHeight;
       floorTop = H * C.floorTopPct; floorBottom = H * C.floorBottomPct;
       petSize = Math.round((PET_REF_WIDTH / REFERENCE_RESOLUTION.width) * W); // 데코와 동일 공식
       wrap.style.width = petSize + "px"; wrap.style.height = petSize + "px";
+      if (foodRef.current) foodRef.current.style.fontSize = Math.round(petSize * 0.34) + "px";  // 밥 이미지 크기 = 펫 비례
     }
     function clampFloor(x, y) {  // x=월드 좌표(방 폭 3W), 발(중심+half)이 마루 밴드 안에 머물도록
       const half = petSize / 2;
@@ -979,6 +993,10 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
       const e = PET_EMOTIONS[Math.floor(Math.random() * PET_EMOTIONS.length)];
       playOneShot(e.motion); showBubble(e.line, C.oneShotMs);  // 말풍선을 감정 모션 길이만큼 유지
     }
+    function startEating() {  // 멈춰서 밥 먹는 연출(보는 방향 옆에 밥 이미지) — feedMs 동안
+      pet.state = "eating"; target = null; eatUntil = now() + C.feedMs;
+      showBubble("냠냠~", C.feedMs);
+    }
 
     function render() {
       const key = pet.state === "oneshot" ? pet.oneShotMotion : (STATE_MOTION[pet.state] || "stand");
@@ -990,14 +1008,22 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
       const footPct = ((pet.y + petSize / 2) / H) * 100;  // 동적 Y-정렬(데코와 동일 스케일)
       wrap.style.zIndex = String(Math.round(Math.min(150, Math.max(1, footPct))));
       bubble.style.opacity = (now() < bubbleUntil && pet.state !== "grabbed") ? "1" : "0";
+      // 밥 이미지 — 먹는 중에만, 펫이 보는 방향(facing) 옆에 표시
+      if (foodRef.current) {
+        const eating = pet.state === "eating";
+        foodRef.current.style.opacity = eating ? "1" : "0";
+        foodRef.current.style.left = pet.facing > 0 ? "76%" : "-32%";
+      }
     }
 
     let rafId = 0;
     function tick() {
       const t = now();
+      if (feedSignalRef.current !== seenFeed) { seenFeed = feedSignalRef.current; if (pet.state !== "grabbed") startEating(); }
       switch (pet.state) {
         case "grabbed": break;
         case "oneshot": if (t >= motionUntil) { pet.state = "idle"; idleUntil = t + 400; } break;
+        case "eating":  if (t >= eatUntil)    { pet.state = "idle"; idleUntil = t + 400; } break;
         case "walk": if (target) moveToward(); else pet.state = "idle"; break;
         default: if (t >= idleUntil) pickTarget();
       }
@@ -1060,6 +1086,8 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
     <div ref={wrapRef} data-pet style={{ position:"absolute", left:0, top:0, touchAction:"none", cursor:"grab", userSelect:"none", WebkitUserSelect:"none", willChange:"transform" }}>
       <img ref={imgRef} alt="" draggable={false}
         style={{ width:"100%", height:"100%", objectFit:"contain", display:"block", pointerEvents:"none", filter:`drop-shadow(0 6px 16px ${petColor}88)` }}/>
+      {/* 밥 이미지 — 먹는 중 펫 보는 방향 옆에 표시(render에서 opacity·left 제어) */}
+      <div ref={foodRef} style={{ position:"absolute", top:"52%", lineHeight:1, opacity:0, transition:"opacity .2s", pointerEvents:"none", animation:"float 1s ease-in-out infinite" }}>🍚</div>
       <div ref={bubbleRef} style={{ position:"absolute", left:"50%", bottom:"104%", transform:"translateX(-50%)", background:"#fff", border:"2px solid #333", borderRadius:12, padding:"5px 10px", fontSize:12, fontWeight:800, color:"#222", whiteSpace:"nowrap", opacity:0, transition:"opacity .12s", pointerEvents:"none", fontFamily:"'Jua',sans-serif" }}>
         <span ref={bubbleTextRef}></span>
         <span style={{ position:"absolute", left:"50%", bottom:-7, transform:"translateX(-50%)", width:0, height:0, borderLeft:"6px solid transparent", borderRight:"6px solid transparent", borderTop:"7px solid #333" }}/>
@@ -1234,7 +1262,7 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, onFixTogg
 
 function HomeLayout({
   pet, daily, inv, weather, wm, growthPct, growthMax, missionDone,
-  getPetEmoji, getPetName, getPetImg, getPetMotion, canEvolve,
+  getPetEmoji, getPetName, getPetImg, getPetMotion, canEvolve, feedSignal,
   onFeed, onPlay, onClean, onGiftNav, onStatusCheck, onNav, onShare, onSettings, onEventClaim,
   onDecorSave,
 }) {
@@ -1419,6 +1447,7 @@ function HomeLayout({
             staticEmoji={getPetEmoji()}
             petName={getPetName()}
             petColor={petColor}
+            feedSignal={feedSignal}
           />
         )}
 
@@ -1741,9 +1770,9 @@ function BottomBar({ daily, inv, onFeed, onPlay, onClean, onGiftNav }) {
     <div style={{background:"rgba(80,40,20,.45)",backdropFilter:"blur(14px)",borderTop:"1.5px solid rgba(255,255,255,.15)",padding:"10px 12px 12px",display:"flex",gap:8,flexShrink:0}}>
       {actions.map(a=>(
         <button key={a.label} className="btn-action" onClick={a.onClick}
-          style={{flex:1,background:a.done?"rgba(255,255,255,.08)":`${a.color}44`,border:`1.5px solid ${a.done?"rgba(255,255,255,.1)":`${a.color}88`}`,borderRadius:18,padding:"10px 4px",opacity:a.done ? 0.55 : 1}}>
-          <span style={{fontSize:26,filter:a.done?"grayscale(1)":"none"}}>{a.emoji}</span>
-          <span style={{fontSize:10,fontWeight:800,color:a.done?"rgba(255,255,255,.35)":"#fff"}}>{a.label}</span>
+          style={{flex:1,background:a.done?`${a.color}33`:`${a.color}44`,border:`1.5px solid ${a.done?`${a.color}66`:`${a.color}88`}`,borderRadius:18,padding:"10px 4px",opacity:a.done ? 0.88 : 1}}>
+          <span style={{fontSize:26,filter:a.done?"grayscale(.35)":"none"}}>{a.emoji}</span>
+          <span style={{fontSize:10,fontWeight:800,color:a.done?"rgba(255,255,255,.7)":"#fff"}}>{a.label}</span>
           {/* 완료 줄을 항상 자리잡아 둠 (안 됐을 땐 숨김) → 완료돼도 바 높이 안 변함 */}
           <span style={{fontSize:9,color:"#4ECB71",fontWeight:700,visibility:a.done?"visible":"hidden"}}>✓ 완료</span>
         </button>
