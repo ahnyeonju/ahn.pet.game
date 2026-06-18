@@ -185,6 +185,17 @@ const WEATHER_SKY = {
   sunset: 'linear-gradient(180deg,#C0300A 0%,#F4951A 55%,#FFD870 100%)',
 };
 
+// 밝은 날씨 배경 위 흰 글씨 가독성용 그림자(투명 UI 공통). 날씨 무관하게 대비 확보.
+const TEXT_SH = "0 1px 3px rgba(0,0,0,.7)";
+// 풀스크린(상점·미션·뽑기 등) 밝은 테마. 날씨 무관 고정. 허니/베이지 배경 + 진한 갈색 글씨.
+const SCREEN_BG     = "linear-gradient(180deg,#F5E6C8 0%,#E8D49E 100%)";
+const INK           = "#5A3E1B";              // 본문 진한 갈색 글씨
+const INK_SUB       = "rgba(90,62,27,.6)";    // 보조 글씨
+const INK_FAINT     = "rgba(90,62,27,.4)";    // 흐린 글씨
+const CARD_BG       = "rgba(255,255,255,.45)"; // 크림 카드 배경
+const CARD_BG_DIM   = "rgba(255,255,255,.28)"; // 미보유/비활성 카드
+const CARD_BORDER   = "rgba(120,90,50,.28)";   // 카드 테두리
+const PANEL_BTN     = "rgba(120,90,50,.16)";   // 작은 버튼/칩 배경
 const WEATHER_HOURS    = { nightStart: 20, nightEnd: 6, sunsetStart: 17 };
 const DAILY_EVENT_CHANCE = 0.30;
 const GACHA_RATES      = { superrare: 3, rare: 20 };
@@ -218,7 +229,7 @@ const SHOP_MASTER = [
   // 예시 (파일 추가 후 price/description 수정):
   { id:"bg_001", name:"오로라 설산", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_001.png", description:"신비로운 우주 배경" },
   { id:"bg_002", name:"크리스마스 배경", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_002.png", description:"크리스마스의 아늑한 배경" },
-
+{   id:"bg_003", name:"해질녘 바다", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_003.png", description:"노을이 지는 바닷가 배경" },
   
 
   // ── decoration ───────────────────────────────────────────
@@ -399,6 +410,7 @@ body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-conten
 @keyframes snowfall{0%{transform:translateY(-10px) translateX(0);opacity:1}100%{transform:translateY(100vh) translateX(30px);opacity:0}}
 @keyframes rainfall{0%{transform:translateY(-10px);opacity:1}100%{transform:translateY(100vh);opacity:.3}}
 @keyframes tooltipIn{from{opacity:0;transform:scale(.8) translateY(4px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes confettiBurst{0%{transform:translate(-50%,-50%) rotate(0) scale(.3);opacity:0}8%{opacity:1}68%{opacity:1}100%{transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) rotate(var(--rot)) scale(.85);opacity:0}}
 .btn-action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;cursor:pointer;transition:transform .15s,opacity .15s;}
 .btn-action:active{transform:scale(.9);}
 .btn-side{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;cursor:pointer;transition:transform .15s;}
@@ -550,9 +562,20 @@ export default function App() {
   const devSetTrait     = (t,d)=> setPet(p=>({...p,traits:{...p.traits,[t]:Math.max(0,p.traits[t]+d)}}));
   const devForceForm    = fk  => { setPet(p=>({...p,stage:3,finalForm:fk,growthPoint:GROWTH_THRESHOLDS.stage3})); setInv(i=>({...i,unlockedPets:[...new Set([...i.unlockedPets,fk])]})); showToast(`🔧 ${FINAL_FORMS[fk].name} 강제 적용`); setPopup(null); };
   const devForceEvo     = s   => { if(s===2){ setEvoData({stage:2,finalForm:null}); } else { setEvoData({stage:3,finalForm:determineFinalForm(pet.traits,ghist)}); } setPopup("evolution"); };
+  const devResetPet     = ()  => { setPet(p=>({...DEFAULT_PET,name:p.name})); setPopup(null); showToast("🔧 펫 리셋 (stage1·성장0)"); };  // 이름·알 유지, 단계·성장·성향·폼·케어 초기화
   const devResetDay     = ()  => { const ev=rollDailyEvent(); setDaily({...DEFAULT_DAILY,date:getTodayStr(),event:ev,growthMultiplier:ev?.type==="aurora"?EVENT_REWARDS.aurora.growthMultiplier:1}); if(ev && EVENT_POPUP_ENABLED) setTimeout(()=>setPopup("event"),900); showToast("🔧 하루 초기화"); };
   const devFillMissions = ()  => { setDaily(d=>({...d,missions:{...d.missions,feed:true,play:true,clean:true,gift:true,statusCheck:true,allCompleted:true}})); showToast("🔧 미션 모두 완료 처리"); };
-  const devClaimAll     = ()  => { setDaily(d=>({...d,claimed:{feed:true,play:true,clean:true,gift:true,statusCheck:true,allComplete:true}})); showToast("🔧 모든 보상 수령 처리"); };
+  const devClaimAll     = ()  => {
+    const cl = daily.claimed || {};
+    let growth = 0, currency = 0, tickets = 0;
+    ["feed","play","clean"].forEach(k => { if (daily.missions[k] && !cl[k]) growth += MISSION_REWARDS[k].growth * daily.growthMultiplier; });
+    ["gift","statusCheck"].forEach(k => { if (daily.missions[k] && !cl[k]) currency += MISSION_REWARDS[k].currency; });
+    if (daily.missions.allCompleted && !cl.allComplete) tickets += MISSION_REWARDS.allComplete.tickets;
+    if (growth) setPet(p => ({ ...p, growthPoint: p.growthPoint + growth }));
+    if (currency || tickets) setInv(i => ({ ...i, currency: i.currency + currency, tickets: i.tickets + tickets }));
+    setDaily(d => ({ ...d, claimed: { feed:true, play:true, clean:true, gift:true, statusCheck:true, allComplete:true } }));
+    showToast(`🔧 보상 수령: 성장 +${growth}, 재화 +${currency}, 티켓 +${tickets}`);
+  };
   const devRollEvent    = ()  => { const ev=rollDailyEvent(); setDaily(d=>({...d,event:ev,eventRewardClaimed:false,growthMultiplier:ev?.type==="aurora"?EVENT_REWARDS.aurora.growthMultiplier:1})); if(ev && EVENT_POPUP_ENABLED) setTimeout(()=>setPopup("event"),300); showToast(ev?`🔧 이벤트: ${ev.name}`:"🔧 이벤트 없음 (30% 미달)"); };
   const devResetAll     = ()  => { const ev=rollDailyEvent(); setEgg(null); setPet(DEFAULT_PET); setDaily({...DEFAULT_DAILY,date:getTodayStr(),event:ev,growthMultiplier:ev?.type==="aurora"?EVENT_REWARDS.aurora.growthMultiplier:1}); setInv(DEFAULT_INV); setGhist([]); setPopup(null); setScreen("egg_select"); localStorage.removeItem("tama_v2"); showToast("🔧 전체 초기화 완료"); };
 
@@ -726,6 +749,7 @@ export default function App() {
     const dir = pet.stage===3&&pet.finalForm ? `stage3/${pet.finalForm}` : `${egg||"egg_red"}/stage${pet.stage}`;
     const m = { stand:`/images/pets/${dir}/stand.webp`, walk:`/images/pets/${dir}/walk.webp` };
     PET_EMOTIONS.forEach(e => { m[e.motion] = `/images/pets/${dir}/${e.motion}.webp`; });
+    m.eat = `/images/pets/${dir}/eat.webp`;  // 먹기 모션(없으면 stand 폴백)
     return m;
   };
 
@@ -736,7 +760,7 @@ export default function App() {
   return (
     <>
       <style>{CSS}</style>
-      <div className="shell" style={{ background: (screen!=="home" && screen!=="egg_select") ? `linear-gradient(rgba(17,17,25,.45),rgba(17,17,25,.45)),${wm.bg}` : wm.bg, transition:"background 1.2s ease" }}>
+      <div className="shell" style={{ background: screen!=="home" ? SCREEN_BG : wm.bg, transition:"background 1.2s ease" }}>
         {toast && <Toast {...toast}/>}
 
         {screen==="egg_select" && <EggSelect onSelect={handleEggSelect}/>}
@@ -774,7 +798,7 @@ export default function App() {
             onToggleDevMode={()=>setDevMode(d=>!d)}
             onClose={()=>setPopup(null)}
             onSetGrowth={devSetGrowth} onSetTrait={devSetTrait}
-            onForceForm={devForceForm} onForceEvo={devForceEvo}
+            onForceForm={devForceForm} onForceEvo={devForceEvo} onResetPet={devResetPet}
             onResetDay={devResetDay} onFillMissions={devFillMissions} onClaimAll={devClaimAll}
             onRollEvent={devRollEvent} onSetWeather={setDevWeather}
             onResetAll={devResetAll}
@@ -899,8 +923,9 @@ const PET_EMOTIONS = [
   { motion: "angry", line: "그만 만져!" },
   { motion: "sad", line: "흑흑…" },
   { motion: "surprise", line: "꺄악!" },
-  { motion: "smug", line: "흥칫뿡" },
 ];
+// 먹기 모션 때 펫 옆에 뜨는 밥 아이콘. imgs를 순서대로 시도(png→webp), 전부 실패 시 emoji 폴백.
+const FOOD_ICON = { imgs: ["/images/icons/food.png", "/images/icons/food.webp"], emoji: "🍚" };
 
 // 모션 에셋 유무를 확인해 wandering / 정적 fallback 결정
 function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji, petName, petColor, feedSignal }) {
@@ -944,7 +969,7 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
     const MOTIONS = { ...motion };  // stand·walk + 감정 키. 로드 실패 src는 failedSrc에 기록해 stand로
     const failedSrc = new Set();
     img.onerror = () => { failedSrc.add(curSrc); if (curSrc !== MOTIONS.stand) { curSrc = MOTIONS.stand; img.src = MOTIONS.stand; } };
-    const STATE_MOTION = { idle: "stand", walk: "walk", grabbed: "stand" };
+    const STATE_MOTION = { idle: "stand", walk: "walk", grabbed: "stand", eating: "eat" };
     const now = () => performance.now();
 
     let W = 0, H = 0, floorTop = 0, floorBottom = 0, petSize = 0;
@@ -1012,7 +1037,7 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
       if (foodRef.current) {
         const eating = pet.state === "eating";
         foodRef.current.style.opacity = eating ? "1" : "0";
-        foodRef.current.style.left = pet.facing > 0 ? "76%" : "-32%";
+        foodRef.current.style.left = pet.facing > 0 ? "54%" : "-10%";
       }
     }
 
@@ -1086,8 +1111,15 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
     <div ref={wrapRef} data-pet style={{ position:"absolute", left:0, top:0, touchAction:"none", cursor:"grab", userSelect:"none", WebkitUserSelect:"none", willChange:"transform" }}>
       <img ref={imgRef} alt="" draggable={false}
         style={{ width:"100%", height:"100%", objectFit:"contain", display:"block", pointerEvents:"none", filter:`drop-shadow(0 6px 16px ${petColor}88)` }}/>
-      {/* 밥 이미지 — 먹는 중 펫 보는 방향 옆에 표시(render에서 opacity·left 제어) */}
-      <div ref={foodRef} style={{ position:"absolute", top:"52%", lineHeight:1, opacity:0, transition:"opacity .2s", pointerEvents:"none", animation:"float 1s ease-in-out infinite" }}>🍚</div>
+      {/* 밥 아이콘 — 먹는 중 펫 보는 방향 옆에 표시(render에서 opacity·left 제어). img 우선, 실패 시 emoji 폴백 */}
+      <div ref={foodRef} style={{ position:"absolute", top:"52%", lineHeight:1, opacity:0, transition:"opacity .2s", pointerEvents:"none", animation:"float 1s ease-in-out infinite" }}>
+        <img src={FOOD_ICON.imgs[0]} alt="" draggable={false} data-i="0"
+          onError={e => { const el=e.currentTarget, n=+el.dataset.i+1;
+            if (n < FOOD_ICON.imgs.length) { el.dataset.i=n; el.src=FOOD_ICON.imgs[n]; }
+            else { el.style.display="none"; el.nextSibling.style.display="inline"; } }}
+          style={{ width:"2.2em", height:"2.2em", objectFit:"contain", display:"block" }}/>
+        <span style={{ display:"none" }}>{FOOD_ICON.emoji}</span>
+      </div>
       <div ref={bubbleRef} style={{ position:"absolute", left:"50%", bottom:"104%", transform:"translateX(-50%)", background:"#fff", border:"2px solid #333", borderRadius:12, padding:"5px 10px", fontSize:12, fontWeight:800, color:"#222", whiteSpace:"nowrap", opacity:0, transition:"opacity .12s", pointerEvents:"none", fontFamily:"'Jua',sans-serif" }}>
         <span ref={bubbleTextRef}></span>
         <span style={{ position:"absolute", left:"50%", bottom:-7, transform:"translateX(-50%)", width:0, height:0, borderLeft:"6px solid transparent", borderRight:"6px solid transparent", borderTop:"7px solid #333" }}/>
@@ -1107,22 +1139,22 @@ function EggSelect({ onSelect }) {
     <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28,gap:20,animation:"fadeUp .5s ease"}}>
       <div style={{textAlign:"center"}}>
         <div style={{fontSize:52,marginBottom:8}}>🌟</div>
-        <h1 style={{fontFamily:"'Jua',sans-serif",fontSize:26,color:"#fff",textShadow:"0 2px 12px rgba(0,0,0,.4)",marginBottom:4}}>펫을 선택하세요</h1>
-        <p style={{color:"rgba(255,255,255,.7)",fontSize:13}}>어떤 알에서 어떤 펫이 나올지 몰라요!</p>
+        <h1 style={{fontFamily:"'Jua',sans-serif",fontSize:26,color:INK,marginBottom:4}}>펫을 선택하세요</h1>
+        <p style={{color:INK_SUB,fontSize:13}}>어떤 알에서 어떤 펫이 나올지 몰라요!</p>
       </div>
       <div style={{width:"100%"}}>
         <input value={name} onChange={e=>setName(e.target.value.slice(0,PET_NAME_MAX))} maxLength={PET_NAME_MAX} placeholder="펫 이름을 지어주세요"
-          style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,.12)",border:`2px solid ${nameValid?"rgba(136,216,176,.7)":"rgba(255,255,255,.25)"}`,borderRadius:16,padding:"12px 14px",fontFamily:"'Jua',sans-serif",fontSize:15,color:"#fff",textAlign:"center",outline:"none"}}/>
-        <p style={{color:"rgba(255,255,255,.45)",fontSize:11,marginTop:6,textAlign:"center"}}>한글·영문·숫자 {PET_NAME_MAX}자 이하 (특수문자·공백 제외)</p>
+          style={{width:"100%",boxSizing:"border-box",background:CARD_BG,border:`2px solid ${nameValid?"rgba(136,196,96,.8)":CARD_BORDER}`,borderRadius:16,padding:"12px 14px",fontFamily:"'Jua',sans-serif",fontSize:15,color:INK,textAlign:"center",outline:"none"}}/>
+        <p style={{color:INK_FAINT,fontSize:11,marginTop:6,textAlign:"center"}}>한글·영문·숫자 {PET_NAME_MAX}자 이하 (특수문자·공백 제외)</p>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,width:"100%",opacity:nameValid?1:.4,pointerEvents:nameValid?"auto":"none",transition:"opacity .2s"}}>
         {EGG_OPTIONS.map(e=>(
           <button key={e.id} onMouseEnter={()=>setHov(e.id)} onMouseLeave={()=>setHov(null)} onClick={()=>onSelect(e.id, trimmed)}
-            style={{background:hov===e.id?e.color:"rgba(255,255,255,.15)",border:`2px solid ${hov===e.id?"rgba(0,0,0,.15)":"rgba(255,255,255,.25)"}`,borderRadius:20,padding:"16px 8px",cursor:"pointer",transform:hov===e.id?"scale(1.06)":"scale(1)",transition:"all .2s",backdropFilter:"blur(8px)"}}>
+            style={{background:hov===e.id?e.color:CARD_BG,border:`2px solid ${hov===e.id?"rgba(0,0,0,.15)":CARD_BORDER}`,borderRadius:20,padding:"16px 8px",cursor:"pointer",transform:hov===e.id?"scale(1.06)":"scale(1)",transition:"all .2s",backdropFilter:"blur(8px)"}}>
             <div style={{display:"flex",justifyContent:"center",marginBottom:5}}>
               <PetSprite size={38} emoji="🥚" imgSrc={`/images/pets/${e.id}/stage1/static.png`}/>
             </div>
-            <div style={{fontFamily:"'Jua',sans-serif",fontSize:12,color:hov===e.id?"#333":"#fff",fontWeight:700}}>{e.label}</div>
+            <div style={{fontFamily:"'Jua',sans-serif",fontSize:12,color:INK,fontWeight:700}}>{e.label}</div>
             {hov===e.id&&<div style={{fontSize:10,color:"#555",marginTop:3}}>{e.hint}</div>}
           </button>
         ))}
@@ -1626,7 +1658,7 @@ function TopBar({ pet, inv, daily, growthPct, growthMax, getPetEmoji, getPetName
           <PetSprite size={20} emoji={getPetEmoji()} imgSrc={getPetImg()}/>
         </div>
         <div style={{textAlign:"left"}}>
-          <div style={{fontFamily:"'Jua',sans-serif",fontSize:12,color:"#fff",lineHeight:1.2}}>{getPetName()}</div>
+          <div style={{fontFamily:"'Jua',sans-serif",fontSize:12,color:"#fff",lineHeight:1.2,textShadow:TEXT_SH}}>{getPetName()}</div>
           <div style={{width:50,height:4,background:"rgba(0,0,0,.15)",borderRadius:4,overflow:"hidden",marginTop:2}}>
             <div style={{width:`${growthPct}%`,height:"100%",background:growthPct>80?"#FFD700":"#4CAF50",borderRadius:4,transition:"width .8s"}}/>
           </div>
@@ -1636,13 +1668,13 @@ function TopBar({ pet, inv, daily, growthPct, growthMax, getPetEmoji, getPetName
       {/* 재화 */}
       <div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.2)",borderRadius:14,padding:"4px 10px",flexShrink:0}}>
         <span style={{fontSize:14}}>💰</span>
-        <span style={{fontWeight:800,fontSize:13,color:"#fff"}}>{inv.currency}</span>
+        <span style={{fontWeight:800,fontSize:13,color:"#fff",textShadow:TEXT_SH}}>{inv.currency}</span>
       </div>
 
       {/* 티켓 */}
       <div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.2)",borderRadius:14,padding:"4px 10px",flexShrink:0}}>
         <span style={{fontSize:14}}>🎫</span>
-        <span style={{fontWeight:800,fontSize:13,color:"#fff"}}>{inv.tickets}</span>
+        <span style={{fontWeight:800,fontSize:13,color:"#fff",textShadow:TEXT_SH}}>{inv.tickets}</span>
       </div>
 
       <div style={{flex:1}}/>
@@ -1653,7 +1685,7 @@ function TopBar({ pet, inv, daily, growthPct, growthMax, getPetEmoji, getPetName
         <div style={{width:28,height:3,background:"rgba(0,0,0,.15)",borderRadius:2,overflow:"hidden"}}>
           <div style={{width:`${(missionDone/5)*100}%`,height:"100%",background:"#FFD700",borderRadius:2}}/>
         </div>
-        <span style={{fontSize:8,color:"rgba(255,255,255,.65)",fontWeight:700,letterSpacing:-0.3}}>{resetIn}</span>
+        <span style={{fontSize:8,color:"rgba(255,255,255,.65)",fontWeight:700,letterSpacing:-0.3,textShadow:TEXT_SH}}>{resetIn}</span>
         {daily.missions.allCompleted && !daily.claimed?.allComplete && <div style={{position:"absolute",top:-4,right:-4,width:10,height:10,background:"#FF5722",borderRadius:"50%"}}/>}
       </button>
 
@@ -1692,7 +1724,7 @@ function LeftPanel({ weather, wm, daily, hasEvent, onNav, onEventClaim }) {
       {/* 날씨 카드 */}
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",background:"rgba(255,255,255,.22)",backdropFilter:"blur(8px)",borderRadius:16,padding:"8px 0",width:52,border:"1.5px solid rgba(255,255,255,.3)"}}>
         <span style={{fontSize:20}}>{wm.emoji}</span>
-        <span style={{fontSize:9,fontWeight:700,color:"#fff",marginTop:2}}>{wm.label}</span>
+        <span style={{fontSize:9,fontWeight:700,color:"#fff",marginTop:2,textShadow:TEXT_SH}}>{wm.label}</span>
       </div>
 
       {/* 이벤트 카드 */}
@@ -1701,7 +1733,7 @@ function LeftPanel({ weather, wm, daily, hasEvent, onNav, onEventClaim }) {
           onClick={()=>setEvOpen(v=>!v)}
           style={{display:"flex",flexDirection:"column",alignItems:"center",background:hasEvent?"rgba(255,220,50,.35)":"rgba(255,255,255,.12)",backdropFilter:"blur(8px)",borderRadius:16,padding:"8px 0",width:52,border:`1.5px solid ${hasEvent?"rgba(255,220,50,.6)":"rgba(255,255,255,.2)"}`,cursor:"pointer",position:"relative"}}>
           <span style={{fontSize:20}}>{daily.event.emoji}</span>
-          <span style={{fontSize:9,fontWeight:700,color:"#fff",marginTop:2}}>이벤트</span>
+          <span style={{fontSize:9,fontWeight:700,color:"#fff",marginTop:2,textShadow:TEXT_SH}}>이벤트</span>
           {hasEvent&&<div style={{position:"absolute",top:-4,right:-4,width:10,height:10,background:"#FF5722",borderRadius:"50%"}}/>}
         </button>
       )}
@@ -1744,7 +1776,7 @@ function RightPanel({ inv, pet, onNav }) {
         <button key={item.screen} className="btn-side" onClick={()=>onNav(item.screen)}
           style={{background:"rgba(255,255,255,.22)",backdropFilter:"blur(8px)",borderRadius:16,padding:"8px 0",width:52,border:"1.5px solid rgba(255,255,255,.3)",position:"relative"}}>
           <span style={{fontSize:20}}>{item.emoji}</span>
-          <span style={{fontSize:9,fontWeight:700,color:"#fff",marginTop:2}}>{item.label}</span>
+          <span style={{fontSize:9,fontWeight:700,color:"#fff",marginTop:2,textShadow:TEXT_SH}}>{item.label}</span>
           {item.badge!==null&&(
             <div style={{position:"absolute",top:-5,right:-5,background:"#FF5722",borderRadius:10,minWidth:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#fff",padding:"0 3px"}}>
               {item.badge}
@@ -1787,21 +1819,21 @@ function BottomBar({ daily, inv, onFeed, onPlay, onClean, onGiftNav }) {
 function MiniGame({ game, onAnswer, onBack }) {
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,gap:24,animation:"fadeUp .3s ease"}}>
-      <button onClick={onBack} style={{alignSelf:"flex-start",background:"rgba(255,255,255,.2)",border:"none",borderRadius:20,padding:"8px 16px",color:"#fff",fontWeight:700,cursor:"pointer"}}>← 뒤로</button>
+      <button onClick={onBack} style={{alignSelf:"flex-start",background:PANEL_BTN,border:"none",borderRadius:20,padding:"8px 16px",color:INK,fontWeight:700,cursor:"pointer"}}>← 뒤로</button>
       <div style={{textAlign:"center"}}>
         <div style={{fontSize:44,marginBottom:8}}>🎮</div>
-        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:22,color:"#fff",marginBottom:4}}>놀아주기 미니게임</h2>
-        <p style={{color:"rgba(255,255,255,.6)",fontSize:13}}>정답을 맞혀보세요!</p>
+        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:22,color:INK,marginBottom:4}}>놀아주기 미니게임</h2>
+        <p style={{color:INK_SUB,fontSize:13}}>정답을 맞혀보세요!</p>
       </div>
-      <div style={{background:"rgba(255,255,255,.18)",backdropFilter:"blur(12px)",borderRadius:24,padding:"28px 40px",textAlign:"center",border:"2px solid rgba(255,255,255,.3)"}}>
-        <p style={{color:"rgba(255,255,255,.6)",fontSize:13,marginBottom:8}}>다음을 계산하세요</p>
-        <p style={{fontFamily:"'Jua',sans-serif",fontSize:44,color:"#fff",textShadow:"0 2px 12px rgba(0,0,0,.3)"}}>{game.a} × {game.b} = ?</p>
+      <div style={{background:CARD_BG,backdropFilter:"blur(12px)",borderRadius:24,padding:"28px 40px",textAlign:"center",border:`2px solid ${CARD_BORDER}`}}>
+        <p style={{color:INK_SUB,fontSize:13,marginBottom:8}}>다음을 계산하세요</p>
+        <p style={{fontFamily:"'Jua',sans-serif",fontSize:44,color:INK}}>{game.a} × {game.b} = ?</p>
       </div>
       {game.done
         ? <div style={{fontSize:64,animation:"pop .4s ease"}}>{game.correct?"🎉":"😢"}</div>
         : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,width:"100%"}}>
             {game.choices.map((c,i)=>(
-              <button key={i} onClick={()=>onAnswer(c)} style={{background:"rgba(255,255,255,.2)",border:"2px solid rgba(255,255,255,.35)",borderRadius:18,padding:"18px",fontSize:26,fontWeight:900,color:"#fff",cursor:"pointer",fontFamily:"'Jua',sans-serif"}}>
+              <button key={i} onClick={()=>onAnswer(c)} style={{background:CARD_BG,border:`2px solid ${CARD_BORDER}`,borderRadius:18,padding:"18px",fontSize:26,fontWeight:900,color:INK,cursor:"pointer",fontFamily:"'Jua',sans-serif"}}>
                 {c}
               </button>
             ))}
@@ -1838,13 +1870,13 @@ function MissionScreen({ daily, onClaim, onBack }) {
       {/* ── 고정 헤더 영역 (디자인 유지) ── */}
       <div style={{flexShrink:0,padding:"18px 18px 0"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-        <button onClick={onBack} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:20,padding:"8px 14px",color:"#fff",fontWeight:700,cursor:"pointer"}}>←</button>
-        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:"#fff"}}>📋 오늘의 미션</h2>
-        <span style={{marginLeft:"auto",fontSize:13,color:"rgba(255,255,255,.6)"}}>{done}/5 완료</span>
+        <button onClick={onBack} style={{background:PANEL_BTN,border:"none",borderRadius:20,padding:"8px 14px",color:INK,fontWeight:700,cursor:"pointer"}}>←</button>
+        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK}}>📋 오늘의 미션</h2>
+        <span style={{marginLeft:"auto",fontSize:13,color:INK_SUB}}>{done}/5 완료</span>
       </div>
 
       {/* 초기화 시간 */}
-      <div style={{textAlign:"center",fontSize:11,color:"rgba(255,255,255,.35)",marginBottom:6}}>🕛 매일 자정(00:00) 초기화</div>
+      <div style={{textAlign:"center",fontSize:11,color:INK_FAINT,marginBottom:6}}>🕛 매일 자정(00:00) 초기화</div>
 
       {/* 진행도 바 */}
       <div style={{background:"rgba(0,0,0,.15)",borderRadius:10,height:8,overflow:"hidden",marginBottom:14}}>
@@ -1858,17 +1890,17 @@ function MissionScreen({ daily, onClaim, onBack }) {
           const state = getState(ms.key);
           return (
             <div key={ms.key} style={{
-              background: state==="claimed"?"rgba(78,203,113,.18)":state==="claimable"?"rgba(255,215,0,.12)":"rgba(255,255,255,.10)",
-              border:`1.5px solid ${state==="claimed"?"rgba(78,203,113,.4)":state==="claimable"?"rgba(255,215,0,.45)":"rgba(255,255,255,.18)"}`,
+              background: state==="claimed"?"rgba(78,203,113,.22)":state==="claimable"?"rgba(255,193,7,.28)":CARD_BG,
+              border:`1.5px solid ${state==="claimed"?"rgba(78,203,113,.5)":state==="claimable"?"rgba(240,170,20,.55)":CARD_BORDER}`,
               borderRadius:16,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,backdropFilter:"blur(8px)"
             }}>
               <span style={{fontSize:24}}>{ms.emoji}</span>
               <div style={{flex:1}}>
-                <div style={{fontWeight:700,color:state==="todo"?"rgba(255,255,255,.4)":"#fff",fontSize:14}}>{ms.label}</div>
+                <div style={{fontWeight:700,color:state==="todo"?INK_FAINT:INK,fontSize:14}}>{ms.label}</div>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.11)",borderRadius:12,padding:"4px 9px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:4,background:PANEL_BTN,borderRadius:12,padding:"4px 9px"}}>
                 <span style={{fontSize:13}}>{ms.rewardIcon}</span>
-                <span style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.8)"}}>{ms.rewardLabel}</span>
+                <span style={{fontSize:11,fontWeight:700,color:INK_SUB}}>{ms.rewardLabel}</span>
               </div>
               {state==="todo"     && <span style={{fontSize:17,marginLeft:2}}>⬜</span>}
               {state==="claimable"&& <button onClick={()=>onClaim(ms.key)} style={{background:"linear-gradient(135deg,#F7971E,#FFD200)",border:"none",borderRadius:11,padding:"5px 10px",fontSize:11,fontWeight:800,color:"#fff",cursor:"pointer",whiteSpace:"nowrap",marginLeft:2}}>받기</button>}
@@ -1879,18 +1911,18 @@ function MissionScreen({ daily, onClaim, onBack }) {
 
         {/* 전체 완료 보너스 */}
         <div style={{
-          background: cl.allComplete?"rgba(78,203,113,.18)":allBonusClaimable?"rgba(255,215,0,.18)":"rgba(255,255,255,.07)",
-          border:`1.5px solid ${cl.allComplete?"rgba(78,203,113,.4)":allBonusClaimable?"rgba(255,215,0,.5)":"rgba(255,255,255,.14)"}`,
+          background: cl.allComplete?"rgba(78,203,113,.22)":allBonusClaimable?"rgba(255,193,7,.3)":CARD_BG_DIM,
+          border:`1.5px solid ${cl.allComplete?"rgba(78,203,113,.5)":allBonusClaimable?"rgba(240,170,20,.6)":CARD_BORDER}`,
           borderRadius:16,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,backdropFilter:"blur(8px)",marginTop:2
         }}>
           <span style={{fontSize:24}}>🎫</span>
           <div style={{flex:1}}>
-            <div style={{fontWeight:700,color:cl.allComplete?"#4ECB71":allBonusClaimable?"#FFD700":"rgba(255,255,255,.4)",fontSize:14}}>전체 완료 보너스</div>
-            <div style={{fontSize:10,color:"rgba(255,255,255,.35)"}}>모든 보상 수령 후 획득</div>
+            <div style={{fontWeight:700,color:cl.allComplete?"#2E9E50":allBonusClaimable?"#C8881A":INK_FAINT,fontSize:14}}>전체 완료 보너스</div>
+            <div style={{fontSize:10,color:INK_FAINT}}>모든 보상 수령 후 획득</div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.11)",borderRadius:12,padding:"4px 9px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:4,background:PANEL_BTN,borderRadius:12,padding:"4px 9px"}}>
             <span style={{fontSize:13}}>🎫</span>
-            <span style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.8)"}}>×{MISSION_REWARDS.allComplete.tickets}</span>
+            <span style={{fontSize:11,fontWeight:700,color:INK_SUB}}>×{MISSION_REWARDS.allComplete.tickets}</span>
           </div>
           {cl.allComplete        && <span style={{fontSize:17,marginLeft:2}}>✅</span>}
           {allBonusClaimable     && <button onClick={()=>onClaim("allComplete")} style={{background:"linear-gradient(135deg,#F7971E,#FFD200)",border:"none",borderRadius:11,padding:"5px 10px",fontSize:11,fontWeight:800,color:"#fff",cursor:"pointer",whiteSpace:"nowrap",marginLeft:2}}>받기</button>}
@@ -1908,35 +1940,35 @@ function GachaScreen({ inv, daily, lastDraw, onDraw, onBack }) {
   const [spinning, setSpinning] = useState(false);
   const doSpin     = () => { if(inv.tickets<1||spinning) return; setSpinning(true); setTimeout(()=>{ onDraw(false); setSpinning(false); },700); };
   const doFreeSpin = () => { if(daily.freeGachaDone||spinning) return; setSpinning(true); setTimeout(()=>{ onDraw(true); setSpinning(false); },700); };
-  const gc = { normal:"#aaa", rare:"#4FC3F7", superrare:"#FFD700" };
+  const gc = { normal:"#8a7355", rare:"#1E88C7", superrare:"#C8881A" };
   const gl = { normal:"⚪ 일반", rare:"💙 희귀", superrare:"🌟 초레어" };
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:20,animation:"fadeUp .3s ease"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,alignSelf:"flex-start"}}>
-        <button onClick={onBack} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:20,padding:"8px 14px",color:"#fff",fontWeight:700,cursor:"pointer"}}>←</button>
-        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:"#fff"}}>🎰 선물뽑기</h2>
+        <button onClick={onBack} style={{background:PANEL_BTN,border:"none",borderRadius:20,padding:"8px 14px",color:INK,fontWeight:700,cursor:"pointer"}}>←</button>
+        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK}}>🎰 선물뽑기</h2>
       </div>
-      <div style={{background:"rgba(255,255,255,.12)",border:"2px solid rgba(255,255,255,.25)",borderRadius:28,padding:"32px 20px",textAlign:"center",width:"100%",backdropFilter:"blur(12px)",marginBottom:20}}>
+      <div style={{background:CARD_BG,border:`2px solid ${CARD_BORDER}`,borderRadius:28,padding:"32px 20px",textAlign:"center",width:"100%",backdropFilter:"blur(12px)",marginBottom:20}}>
         <div style={{fontSize:72,marginBottom:12,animation:spinning?"float .4s ease infinite":"float 3s ease-in-out infinite"}}>{spinning?"✨":lastDraw?lastDraw.emoji:"🎁"}</div>
         {lastDraw&&!spinning&&(
           <div style={{animation:"pop .4s ease"}}>
             <div style={{fontSize:13,color:gc[lastDraw.grade],fontWeight:800,marginBottom:4}}>{gl[lastDraw.grade]}</div>
-            <div style={{fontSize:18,fontWeight:700,color:"#fff"}}>{lastDraw.name}</div>
-            <div style={{fontSize:13,color:"rgba(255,255,255,.6)",marginTop:4}}>{TRAITS[lastDraw.trait].emoji} {TRAITS[lastDraw.trait].label} +{lastDraw.traitValue}</div>
+            <div style={{fontSize:18,fontWeight:700,color:INK}}>{lastDraw.name}</div>
+            <div style={{fontSize:13,color:INK_SUB,marginTop:4}}>{TRAITS[lastDraw.trait].emoji} {TRAITS[lastDraw.trait].label} +{lastDraw.traitValue}</div>
           </div>
         )}
       </div>
       <button onClick={doFreeSpin} disabled={daily.freeGachaDone||spinning}
-        style={{background:daily.freeGachaDone?"rgba(255,255,255,.1)":"linear-gradient(135deg,#43a047,#66bb6a)",border:"none",borderRadius:20,padding:"14px 40px",fontSize:15,fontWeight:800,color:"#fff",cursor:daily.freeGachaDone?"not-allowed":"pointer",width:"100%",marginBottom:10,fontFamily:"'Jua',sans-serif",boxShadow:daily.freeGachaDone?"none":"0 4px 20px rgba(67,160,71,.4)"}}>
+        style={{background:daily.freeGachaDone?CARD_BG_DIM:"linear-gradient(135deg,#43a047,#66bb6a)",border:"none",borderRadius:20,padding:"14px 40px",fontSize:15,fontWeight:800,color:daily.freeGachaDone?INK_SUB:"#fff",cursor:daily.freeGachaDone?"not-allowed":"pointer",width:"100%",marginBottom:10,fontFamily:"'Jua',sans-serif",boxShadow:daily.freeGachaDone?"none":"0 4px 20px rgba(67,160,71,.4)"}}>
         {daily.freeGachaDone?"오늘 무료 뽑기 완료 ✓":"🎁 무료 뽑기 1회 (매일)"}
       </button>
       <button onClick={doSpin} disabled={inv.tickets<1||spinning}
-        style={{background:inv.tickets>0?"linear-gradient(135deg,#F7971E,#FFD200)":"rgba(255,255,255,.15)",border:"none",borderRadius:20,padding:"14px 40px",fontSize:15,fontWeight:800,color:"#fff",cursor:inv.tickets>0?"pointer":"not-allowed",width:"100%",marginBottom:10,fontFamily:"'Jua',sans-serif",boxShadow:inv.tickets>0?"0 4px 20px rgba(247,151,30,.4)":"none"}}>
+        style={{background:inv.tickets>0?"linear-gradient(135deg,#F7971E,#FFD200)":CARD_BG_DIM,border:"none",borderRadius:20,padding:"14px 40px",fontSize:15,fontWeight:800,color:inv.tickets>0?"#fff":INK_SUB,cursor:inv.tickets>0?"pointer":"not-allowed",width:"100%",marginBottom:10,fontFamily:"'Jua',sans-serif",boxShadow:inv.tickets>0?"0 4px 20px rgba(247,151,30,.4)":"none"}}>
         🎫 뽑기 1회 (티켓 1장)
       </button>
-      <div style={{color:"rgba(255,255,255,.5)",fontSize:12,marginBottom:14}}>보유 티켓: {inv.tickets}장</div>
-      <div style={{background:"rgba(255,255,255,.08)",borderRadius:14,padding:"12px 20px",width:"100%",fontSize:12,color:"rgba(255,255,255,.6)",display:"flex",flexDirection:"column",gap:5}}>
-        {[["⚪ 일반","#aaa","80%","+1"],["💙 희귀","#4FC3F7","17%","+2"],["🌟 초레어","#FFD700","3%","+3"]].map(([n,c,p,v])=>(
+      <div style={{color:INK_SUB,fontSize:12,marginBottom:14}}>보유 티켓: {inv.tickets}장</div>
+      <div style={{background:CARD_BG_DIM,borderRadius:14,padding:"12px 20px",width:"100%",fontSize:12,color:INK_SUB,display:"flex",flexDirection:"column",gap:5}}>
+        {[["⚪ 일반","#8a7355","80%","+1"],["💙 희귀","#1E88C7","17%","+2"],["🌟 초레어","#C8881A","3%","+3"]].map(([n,c,p,v])=>(
           <div key={n} style={{display:"flex",justifyContent:"space-between"}}><span style={{color:c}}>{n}</span><span>{p} · 성향 {v}</span></div>
         ))}
       </div>
@@ -2030,17 +2062,17 @@ function GiftBox({ inv, daily, sel, onSel, onGive, onSell, onBack }) {
     acc[g.id].count++;
     return acc;
   }, {}));
-  const gc = { normal:"rgba(255,255,255,.12)", rare:"rgba(79,195,247,.18)", superrare:"rgba(255,215,0,.18)" };
-  const gb = { normal:"rgba(255,255,255,.2)", rare:"#4FC3F7", superrare:"#FFD700" };
+  const gc = { normal:CARD_BG, rare:"rgba(79,195,247,.25)", superrare:"rgba(255,193,7,.28)" };
+  const gb = { normal:CARD_BORDER, rare:"#4FC3F7", superrare:"#E0A91E" };
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",padding:18,animation:"fadeUp .3s ease"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <button onClick={onBack} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:20,padding:"8px 14px",color:"#fff",fontWeight:700,cursor:"pointer"}}>←</button>
-        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:"#fff"}}>🎁 선물함</h2>
-        <span style={{marginLeft:"auto",fontSize:13,color:"rgba(255,255,255,.5)"}}>{inv.gifts.length}개</span>
+        <button onClick={onBack} style={{background:PANEL_BTN,border:"none",borderRadius:20,padding:"8px 14px",color:INK,fontWeight:700,cursor:"pointer"}}>←</button>
+        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK}}>🎁 선물함</h2>
+        <span style={{marginLeft:"auto",fontSize:13,color:INK_SUB}}>{inv.gifts.length}개</span>
       </div>
       {inv.gifts.length === 0
-        ? <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,color:"rgba(255,255,255,.4)"}}>
+        ? <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,color:INK_FAINT}}>
             <span style={{fontSize:48}}>📭</span><p style={{fontSize:13}}>선물이 없어요. 뽑기를 해보세요!</p>
           </div>
         : <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,flex:1,overflowY:"auto",alignContent:"start",paddingBottom:8}}>
@@ -2048,10 +2080,10 @@ function GiftBox({ inv, daily, sel, onSel, onGive, onSell, onBack }) {
               <button key={g.id} onClick={()=>onSel(g.first)}
                 style={{background:gc[g.grade],border:`2px solid ${gb[g.grade]}`,borderRadius:18,padding:"16px 8px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
                 <div style={{fontSize:40,lineHeight:1}}>{g.emoji}</div>
-                <div style={{fontSize:12,fontWeight:800,color:"#fff"}}>{g.name}</div>
+                <div style={{fontSize:12,fontWeight:800,color:INK}}>{g.name}</div>
                 <div style={{fontSize:11,color:TRAITS[g.trait].color,whiteSpace:"nowrap"}}>
                   {TRAITS[g.trait].emoji} +{g.traitValue}
-                  {g.count>1 && <span style={{color:"rgba(255,255,255,.55)"}}> · {g.count}개 보유</span>}
+                  {g.count>1 && <span style={{color:INK_SUB}}> · {g.count}개 보유</span>}
                 </div>
               </button>
             ))}
@@ -2072,17 +2104,17 @@ function Collection({ inv, onBack }) {
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",padding:18,animation:"fadeUp .3s ease"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
-        <button onClick={onBack} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:20,padding:"8px 14px",color:"#fff",fontWeight:700,cursor:"pointer"}}>←</button>
-        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:"#fff"}}>📖 도감</h2>
-        <span style={{marginLeft:"auto",fontSize:13,color:"rgba(255,255,255,.5)"}}>{inv.unlockedPets.length}/6</span>
+        <button onClick={onBack} style={{background:PANEL_BTN,border:"none",borderRadius:20,padding:"8px 14px",color:INK,fontWeight:700,cursor:"pointer"}}>←</button>
+        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK}}>📖 도감</h2>
+        <span style={{marginLeft:"auto",fontSize:13,color:INK_SUB}}>{inv.unlockedPets.length}/6</span>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
         {Object.entries(FINAL_FORMS).map(([key,form])=>{
           const unlocked = inv.unlockedPets.includes(key);
           return (
-            <div key={key} style={{background:unlocked?`${form.color}28`:"rgba(255,255,255,.07)",border:`1.5px solid ${unlocked?form.color+"55":"rgba(255,255,255,.12)"}`,borderRadius:18,padding:"16px 6px",textAlign:"center",backdropFilter:"blur(8px)"}}>
+            <div key={key} style={{background:unlocked?`${form.color}30`:CARD_BG_DIM,border:`1.5px solid ${unlocked?form.color+"66":CARD_BORDER}`,borderRadius:18,padding:"16px 6px",textAlign:"center",backdropFilter:"blur(8px)"}}>
               <div style={{fontSize:40,marginBottom:5,filter:unlocked?"none":"grayscale(1) brightness(.3)"}}>{form.emoji}</div>
-              <div style={{fontSize:11,fontWeight:700,color:unlocked?"#fff":"rgba(255,255,255,.25)"}}>{unlocked?form.name:"???"}</div>
+              <div style={{fontSize:11,fontWeight:700,color:unlocked?INK:INK_FAINT}}>{unlocked?form.name:"???"}</div>
               {unlocked&&<div style={{fontSize:10,color:TRAITS[key].color,marginTop:3}}>{TRAITS[key].emoji} {TRAITS[key].label}</div>}
             </div>
           );
@@ -2342,9 +2374,9 @@ function Shop({ inv, onBuy, onBack }) {
 
       {/* 헤더 */}
       <div style={{display:"flex",alignItems:"center",gap:10,padding:"16px 20px 0",flexShrink:0}}>
-        <button onClick={onBack} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:20,padding:"8px 14px",color:"#fff",fontWeight:700,cursor:"pointer"}}>←</button>
-        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:"#fff"}}>🏪 상점</h2>
-        <div style={{marginLeft:"auto",background:"rgba(255,255,255,.2)",borderRadius:14,padding:"4px 12px",fontSize:13,fontWeight:800,color:"#FFD700"}}>
+        <button onClick={onBack} style={{background:PANEL_BTN,border:"none",borderRadius:20,padding:"8px 14px",color:INK,fontWeight:700,cursor:"pointer"}}>←</button>
+        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK}}>🏪 상점</h2>
+        <div style={{marginLeft:"auto",background:PANEL_BTN,borderRadius:14,padding:"4px 12px",fontSize:13,fontWeight:800,color:"#C8881A"}}>
           💰 {inv.currency}
         </div>
       </div>
@@ -2355,8 +2387,8 @@ function Shop({ inv, onBuy, onBack }) {
           {TABS.map(t=>(
             <button key={t.key} onClick={()=>setTab(t.key)}
               style={{flex:1,padding:"8px 0",borderRadius:12,border:"none",cursor:"pointer",
-                background:tab===t.key?"rgba(255,255,255,.9)":"rgba(255,255,255,.15)",
-                color:tab===t.key?"#333":"#fff",fontWeight:700,fontSize:13,fontFamily:"'Nunito',sans-serif"}}>
+                background:tab===t.key?"#FFF7E6":CARD_BG,
+                color:tab===t.key?INK:INK_SUB,fontWeight:700,fontSize:13,fontFamily:"'Nunito',sans-serif"}}>
               {t.label}
             </button>
           ))}
@@ -2367,28 +2399,28 @@ function Shop({ inv, onBuy, onBack }) {
           <button
             onClick={()=>setSortOpen(o=>!o)}
             style={{width:38,height:38,borderRadius:10,border:"none",cursor:"pointer",
-              background:sortOpen?"rgba(255,255,255,.88)":"rgba(255,255,255,.18)",
+              background:sortOpen?"#FFF7E6":CARD_BG,
               display:"flex",alignItems:"center",justifyContent:"center"}}>
             {/* 3줄 정렬 아이콘 */}
             <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
-              <rect x="0" y="0"  width="18" height="2.2" rx="1.1" fill={sortOpen?"#333":"#fff"}/>
-              <rect x="2" y="5.9" width="14" height="2.2" rx="1.1" fill={sortOpen?"#333":"#fff"}/>
-              <rect x="5" y="11.8" width="8"  height="2.2" rx="1.1" fill={sortOpen?"#333":"#fff"}/>
+              <rect x="0" y="0"  width="18" height="2.2" rx="1.1" fill={INK}/>
+              <rect x="2" y="5.9" width="14" height="2.2" rx="1.1" fill={INK}/>
+              <rect x="5" y="11.8" width="8"  height="2.2" rx="1.1" fill={INK}/>
             </svg>
           </button>
 
           {sortOpen && (
             <div style={{position:"absolute",top:44,right:0,zIndex:50,
-              background:"rgba(30,20,60,.96)",borderRadius:12,overflow:"hidden",
-              boxShadow:"0 4px 20px rgba(0,0,0,.4)",minWidth:90}}>
+              background:"#FFF7E6",borderRadius:12,overflow:"hidden",
+              boxShadow:"0 4px 20px rgba(80,55,20,.3)",minWidth:90,border:`1.5px solid ${CARD_BORDER}`}}>
               {SORT_OPTIONS.map(s=>(
                 <button key={s.key}
                   onClick={()=>{ setSort(s.key); setSortOpen(false); }}
                   style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"11px 14px",
                     border:"none",cursor:"pointer",background:"transparent",textAlign:"left",
                     fontFamily:"'Nunito',sans-serif",fontSize:13,fontWeight:700,
-                    color:sort===s.key?"#FFD700":"rgba(255,255,255,.8)"}}>
-                  <span style={{width:12,fontSize:10,color:"#FFD700"}}>
+                    color:sort===s.key?"#C8881A":INK_SUB}}>
+                  <span style={{width:12,fontSize:10,color:"#C8881A"}}>
                     {sort===s.key?"▶":""}
                   </span>
                   {s.label}
@@ -2404,7 +2436,7 @@ function Shop({ inv, onBuy, onBack }) {
         {sorted.length===0 ? (
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%",gap:12}}>
             <span style={{fontSize:48}}>{CATEGORY_FALLBACK[tab]}</span>
-            <p style={{color:"rgba(255,255,255,.5)",fontSize:13}}>준비 중이에요!</p>
+            <p style={{color:INK_SUB,fontSize:13}}>준비 중이에요!</p>
           </div>
         ) : (
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -2417,8 +2449,8 @@ function Shop({ inv, onBuy, onBack }) {
               const has     = item.isDefault || (stackable ? count > 0 : owned);
               return (
                 <div key={item.id} onClick={()=>setSelectedItem(item)} style={{
-                  background:has?"rgba(255,255,255,.15)":"rgba(255,255,255,.08)",
-                  border:`1.5px solid ${has?"rgba(255,255,255,.35)":"rgba(255,255,255,.15)"}`,
+                  background:has?CARD_BG:CARD_BG_DIM,
+                  border:`1.5px solid ${CARD_BORDER}`,
                   borderRadius:18,padding:"14px 10px",display:"flex",flexDirection:"column",
                   alignItems:"center",gap:8,backdropFilter:"blur(8px)",cursor:"pointer"}}>
 
@@ -2426,14 +2458,14 @@ function Shop({ inv, onBuy, onBack }) {
                     <ShopItemImage item={item} size={64}/>
                   </div>
 
-                  <div style={{fontFamily:"'Jua',sans-serif",fontSize:13,color:"#fff",textAlign:"center",
+                  <div style={{fontFamily:"'Jua',sans-serif",fontSize:13,color:INK,textAlign:"center",
                     wordBreak:"keep-all",WebkitLineClamp:2,overflow:"hidden",
                     display:"-webkit-box",WebkitBoxOrient:"vertical"}}>
                     {item.name}
                   </div>
 
                   <div style={{fontSize:11,fontWeight:800,
-                    color:item.isDefault?"rgba(80,220,120,.8)":canAfford?"#FFD700":"#FF6B6B"}}>
+                    color:item.isDefault?"#3E9E54":canAfford?"#C8881A":"#D9483B"}}>
                     {item.isDefault
                       ? "기본 제공"
                       : stackable
@@ -2468,16 +2500,16 @@ function SkillScreen({ pet, onBack }) {
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:20,animation:"fadeUp .3s ease"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,alignSelf:"flex-start"}}>
-        <button onClick={onBack} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:20,padding:"8px 14px",color:"#fff",fontWeight:700,cursor:"pointer"}}>←</button>
-        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:"#fff"}}>⚡ 고유 스킬</h2>
+        <button onClick={onBack} style={{background:PANEL_BTN,border:"none",borderRadius:20,padding:"8px 14px",color:INK,fontWeight:700,cursor:"pointer"}}>←</button>
+        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK}}>⚡ 고유 스킬</h2>
       </div>
       {form&&(
         <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:18,width:"100%"}}>
           <div style={{fontSize:76}}>{form.skillEmoji}</div>
-          <h3 style={{fontFamily:"'Jua',sans-serif",fontSize:22,color:"#fff"}}>{form.skill}</h3>
-          <div style={{background:"rgba(255,255,255,.1)",border:"2px dashed rgba(255,255,255,.3)",borderRadius:20,padding:"22px",width:"100%",textAlign:"center",backdropFilter:"blur(8px)"}}>
+          <h3 style={{fontFamily:"'Jua',sans-serif",fontSize:22,color:INK}}>{form.skill}</h3>
+          <div style={{background:CARD_BG,border:`2px dashed ${CARD_BORDER}`,borderRadius:20,padding:"22px",width:"100%",textAlign:"center",backdropFilter:"blur(8px)"}}>
             <div style={{fontSize:30,marginBottom:10}}>🔧</div>
-            <p style={{color:"rgba(255,255,255,.6)",fontSize:13,lineHeight:1.7}}>이 스킬은 향후 업데이트에서<br/>사용 가능해질 예정이에요.<br/><br/><span style={{color:form.color,fontWeight:700}}>"{form.name}"</span>의<br/><span style={{color:"#FFD700"}}>{form.skillEmoji} {form.skill}</span>을 기대해 주세요!</p>
+            <p style={{color:INK_SUB,fontSize:13,lineHeight:1.7}}>이 스킬은 향후 업데이트에서<br/>사용 가능해질 예정이에요.<br/><br/><span style={{color:form.color,fontWeight:700}}>"{form.name}"</span>의<br/><span style={{color:"#C8881A"}}>{form.skillEmoji} {form.skill}</span>을 기대해 주세요!</p>
           </div>
         </div>
       )}
@@ -2683,11 +2715,43 @@ function RainbowPopup({ onChoose, onClose }) {
 // ===================================================
 // 팝업: 진화
 // ===================================================
+// 진화 축하 색종이 파티클 — 중앙에서 가장자리로 팡 터지며 회전·페이드. 마운트 시 1회 재생.
+const CONFETTI_COLORS = ["#FF5252","#FFD740","#40C4FF","#69F0AE","#E040FB","#FF6E40","#FFFFFF","#FFAB40"];
+function EvoConfetti({ count = 100 }) {
+  const [pieces] = useState(() => {
+    const W = Math.min(window.innerWidth, 420), H = Math.min(window.innerHeight, 910);
+    const reach = Math.hypot(W, H) / 2;  // shell 대각 절반 ≈ 가장자리(넘치면 overflow로 잘림)
+    return Array.from({ length: count }, (_, i) => {
+      const a = Math.random() * Math.PI * 2, d = reach * (0.5 + Math.random() * 0.7);
+      const round = Math.random() < 0.3, w = 6 + Math.random() * 7;
+      return {
+        tx: Math.cos(a) * d, ty: Math.sin(a) * d, rot: Math.random() * 720 - 360,
+        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        w, h: round ? w : 10 + Math.random() * 10, round,
+        delay: Math.random() * 0.1, dur: 0.9 + Math.random() * 0.7,
+      };
+    });
+  });
+  return (
+    <div style={{position:"absolute",inset:0,overflow:"hidden",pointerEvents:"none",zIndex:10002}}>
+      {pieces.map((p, i) => (
+        <span key={i} style={{
+          position:"absolute", left:"50%", top:"46%", width:p.w, height:p.h,
+          background:p.color, borderRadius:p.round?"50%":2,
+          "--tx":`${p.tx}px`, "--ty":`${p.ty}px`, "--rot":`${p.rot}deg`,
+          animation:`confettiBurst ${p.dur}s cubic-bezier(.12,.6,.35,1) ${p.delay}s both`,
+        }}/>
+      ))}
+    </div>
+  );
+}
+
 function EvoPopup({ data, egg, onConfirm }) {
   const is3 = data.stage===3;
   const form = is3&&data.finalForm ? FINAL_FORMS[data.finalForm] : null;
   return (
     <Overlay style={{zIndex:10000}}>
+      <EvoConfetti count={is3?130:90}/>
       <div style={{background:is3?"rgba(8,6,20,.98)":"rgba(16,14,36,.96)",backdropFilter:"blur(20px)",borderRadius:32,padding:"38px 26px",width:"88%",maxWidth:360,textAlign:"center",border:`2px solid ${is3?"#FFD700":"rgba(255,255,255,.2)"}`,animation:is3?"glow 2s ease infinite, pop .5s ease":"pop .4s ease"}}>
         <div style={{fontSize:15,color:is3?"#FFD700":"rgba(255,255,255,.55)",marginBottom:6,fontWeight:700}}>{is3?"✨ 최종 진화!":"🎉 진화!"}</div>
         <div style={{marginBottom:14,animation:"float 2s ease-in-out infinite",display:"flex",justifyContent:"center"}}>
@@ -2745,7 +2809,7 @@ function DevSection({ title, children }) {
     </div>
   );
 }
-function DevPanel({ pet, daily, devMode, devWeather, onToggleDevMode, onClose, onSetGrowth, onSetTrait, onForceForm, onForceEvo, onResetDay, onFillMissions, onClaimAll, onRollEvent, onSetWeather, onResetAll }) {
+function DevPanel({ pet, daily, devMode, devWeather, onToggleDevMode, onClose, onSetGrowth, onSetTrait, onForceForm, onForceEvo, onResetPet, onResetDay, onFillMissions, onClaimAll, onRollEvent, onSetWeather, onResetAll }) {
   const [growthInput, setGrowthInput] = useState(String(pet.growthPoint));
   return (
     <div style={{position:"absolute",inset:0,zIndex:8000,background:"rgba(0,0,0,.88)",backdropFilter:"blur(6px)",display:"flex",flexDirection:"column",overflowY:"auto",padding:"12px 14px"}}>
@@ -2827,8 +2891,9 @@ function DevPanel({ pet, daily, devMode, devWeather, onToggleDevMode, onClose, o
         <div style={{display:"flex",gap:5,marginBottom:4}}>
           <DevBtn onClick={()=>onForceEvo(2)} color="#26A69A">🥚→🐣 2단계</DevBtn>
           <DevBtn onClick={()=>onForceEvo(3)} color="#AB47BC">🐣→✨ 3단계</DevBtn>
+          <DevBtn onClick={onResetPet} color="#EC407A">🥚 알 단계로</DevBtn>
         </div>
-        <div style={{fontSize:9,color:"rgba(255,255,255,.3)"}}>진화 팝업을 직접 트리거. 2단계는 stage 변경 없이 팝업만 발생.</div>
+        <div style={{fontSize:9,color:"rgba(255,255,255,.3)"}}>진화 팝업을 직접 트리거. 2단계는 stage 변경 없이 팝업만 발생. 알 단계로 = stage1·성장0·성향0으로 리셋(이름 유지).</div>
       </DevSection>
 
       {/* 최종 폼 강제 */}
