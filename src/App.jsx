@@ -426,9 +426,9 @@ const CSS = `
 @font-face{font-family:'Nunito';font-style:normal;font-weight:900;font-display:swap;src:url('/fonts/nunito-900.woff2') format('woff2');}
 @font-face{font-family:'Jua';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/jua-400.woff2') format('woff2');}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;}
-.shell{width:min(100vw,420px);flex-shrink:0;height:100dvh;max-height:910px;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
-@media(min-width:480px){.shell{border-radius:36px;height:910px;}}
+body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-content:center;align-items:center;min-height:100dvh;overflow:hidden;}
+.shell{width:min(100vw,420px);flex-shrink:0;height:100dvh;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
+@media(min-width:480px){.shell{border-radius:36px;height:910px;max-height:910px;}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
 @keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
@@ -805,7 +805,7 @@ export default function App() {
         {screen==="skill"    && <SkillScreen pet={pet} onBack={()=>setScreen("home")}/>}
         {screen==="competition" && <PlaceholderScreen emoji="🏆" title="대회"     desc="다른 펫들과 실력을 겨루는 대회예요." onBack={()=>setScreen("home")}/>}
         {screen==="outing"      && <OutingScreen egg={egg} pet={pet} inv={inv} weather={weather} onBack={()=>setScreen("home")}/>}
-        {screen==="social"      && <PlaceholderScreen emoji="👥" title="소셜"     desc="친구들과 펫을 자랑하고 교류해요."   onBack={()=>setScreen("home")}/>}
+        {screen==="social"      && <ARSocialScreen egg={egg} pet={pet} onBack={()=>setScreen("home")}/>}
 
         {popup==="status"    && <StatusPopup pet={pet} growthMax={growthMax} canEvolve={canEvolve} onEvolve={handleEvolve} onNewPet={()=>setPopup("newpet")} onClose={()=>setPopup(null)} petName={getPetName()} petMotion={getPetMotion()} petEmoji={getPetEmoji()}/>}
         {popup==="newpet"    && <NewPetConfirmPopup petName={getPetName()} onConfirm={startNewPet} onCancel={()=>setPopup("status")}/>}
@@ -2722,6 +2722,360 @@ function OutingScreen({ egg, pet, inv, weather, onBack }) {
         <button onClick={doCopy} style={{width:"100%",marginTop:10,background:CARD_BG_DIM,border:`1.5px solid ${CARD_BORDER}`,borderRadius:14,padding:"12px",fontSize:14,fontWeight:800,color:INK,cursor:"pointer",fontFamily:"'Jua',sans-serif"}}>{copied?"✓ 복사됨":"📋 코드 복사"}</button>
         <p style={{color:INK_FAINT,fontSize:11,marginTop:8,lineHeight:1.6}}>이 코드를 친구에게 주면 친구가 내 집을 구경할 수 있어요. 외부 서버 없이 코드로만 동작해요.</p>
       </div>
+    </div>
+  );
+}
+
+// ===================================================
+// 소셜 — AR 펫 카메라. 카메라 영상 위에 펫을 올려 이동·핀치 크기·회전, 모션 고정, 캡처(공유/저장).
+// 라이브러리 없음: getUserMedia + canvas 합성. 카메라는 HTTPS 또는 localhost에서만 동작.
+// ===================================================
+const AR_MOTIONS = [
+  { key:"stand",    icon:"🧍", label:"기본" },
+  { key:"walk",     icon:"🚶", label:"걷기" },
+  { key:"angry",    icon:"😠", label:"화남" },
+  { key:"sad",      icon:"😢", label:"슬픔" },
+  { key:"surprise", icon:"😲", label:"놀람" },
+  { key:"eat",      icon:"🍚", label:"먹기" },
+];
+const AR_PET_BASE = 150;  // 펫 기본 표시 폭(px). scale로 확대·축소.
+
+// ── AR 사진 보관함 (IndexedDB, 로컬·무서버). 캡처 이미지를 blob으로 저장/조회/삭제 ──
+const PHOTO_DB = "tama_photos", PHOTO_STORE = "photos";
+function photoDB() {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open(PHOTO_DB, 1);
+    r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(PHOTO_STORE)) r.result.createObjectStore(PHOTO_STORE, { keyPath:"id" }); };
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+async function savePhoto(blob, id) {
+  const db = await photoDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PHOTO_STORE, "readwrite");
+    tx.objectStore(PHOTO_STORE).put({ id, blob });
+    tx.oncomplete = () => resolve(id); tx.onerror = () => reject(tx.error);
+  });
+}
+async function loadPhotos() {
+  const db = await photoDB();
+  return new Promise((resolve, reject) => {
+    const rq = db.transaction(PHOTO_STORE, "readonly").objectStore(PHOTO_STORE).getAll();
+    rq.onsuccess = () => resolve((rq.result || []).sort((a, b) => b.id - a.id));  // 최신순
+    rq.onerror = () => reject(rq.error);
+  });
+}
+async function deletePhoto(id) {
+  const db = await photoDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(PHOTO_STORE, "readwrite");
+    tx.objectStore(PHOTO_STORE).delete(id); tx.oncomplete = () => resolve();
+  });
+}
+
+function ARSocialScreen({ egg, pet, onBack }) {
+  const videoRef = useRef(null), wrapRef = useRef(null), petImgRef = useRef(null);
+  const [camState, setCamState] = useState("loading");   // loading | on | denied
+  const [motionKey, setMotionKey] = useState("stand");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [tf, setTf] = useState({ x:0, y:0, s:1, r:0 });   // 펫 중심 x,y(px) / scale / rotation(deg)
+  const tfRef = useRef(tf); useEffect(() => { tfRef.current = tf; }, [tf]);
+  const gRef = useRef(null);
+  const touchedAt = useRef(0);  // 최근 터치 시각 — 터치 후 합성 mouse 이벤트(ghost) 무시용
+  const [arLock, setArLock] = useState(false);     // 자이로 고정 ON/OFF
+  const [gyro, setGyro] = useState({ dx:0, dy:0 }); // 기울기 기반 펫 화면 오프셋(px)
+  const orientRef = useRef(null), baseRef = useRef(null), smoothRef = useRef({ dx:0, dy:0 });
+  const trackRef = useRef(null), streamRef = useRef(null);  // 카메라 트랙(재초점)·스트림(전환 시 정리)
+  const [facing, setFacing] = useState("environment");      // 후면(environment) / 전면(user)
+  const facingRef = useRef("environment");
+  const [zoomRange, setZoomRange] = useState(null);        // 줌 {min,max,step} (지원 기기만)
+  const [zoomVal, setZoomVal] = useState(1);
+  const [zoomOpen, setZoomOpen] = useState(false);         // 줌 슬라이더 펼침
+  const [photos, setPhotos] = useState([]);                // 보관함 [{id, blob, url}] 최신순
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [viewerId, setViewerId] = useState(null);          // 전체보기 중인 사진 id
+  const motion = petMotionOf(egg, pet);
+  const motionSrc = motion[motionKey] || motion.stand;
+  const fallbackSrc = petImgOf(egg, pet);
+
+  // 카메라 시작 — facingMode(앞/뒤). 고해상도(가능한 한 크게) + 자동초점 best-effort(지원 기기만). 줌 범위 캡처.
+  const startCam = async (mode) => {
+    facingRef.current = mode;
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode:{ ideal:mode }, width:{ ideal:2560 }, height:{ ideal:1440 } }, audio:false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await new Promise(res => { videoRef.current.onloadedmetadata = res; });
+        await videoRef.current.play?.().catch(()=>{});
+      }
+      const track = stream.getVideoTracks?.()[0];
+      trackRef.current = track || null;
+      const caps = track?.getCapabilities?.() || {};
+      const settings = track?.getSettings?.() || {};
+      setZoomRange(caps.zoom && caps.zoom.max > caps.zoom.min ? caps.zoom : null);
+      if (caps.zoom) setZoomVal(settings.zoom ?? caps.zoom.min);
+      try { await track?.applyConstraints({ advanced:[{ focusMode:"continuous" }] }); } catch {}  // 자동초점 지원 기기만
+      setCamState("on");
+    } catch (e) { console.warn("[AR] 카메라 시작 실패:", e); setCamState("denied"); }
+  };
+  const setZoom  = (v) => { setZoomVal(v); try { trackRef.current?.applyConstraints({ advanced:[{ zoom:v }] }).catch(()=>{}); } catch {} };
+  useEffect(() => { startCam("environment"); return () => { streamRef.current?.getTracks().forEach(t => t.stop()); }; }, []);
+  // 보관함 로드(최신순) → blob에 object URL 부여. 언마운트 시 URL 해제.
+  useEffect(() => {
+    let urls = [];
+    loadPhotos().then(list => {
+      const withUrl = list.map(p => ({ ...p, url: URL.createObjectURL(p.blob) }));
+      urls = withUrl.map(p => p.url);
+      setPhotos(withUrl);
+    }).catch(()=>{});
+    return () => urls.forEach(u => URL.revokeObjectURL(u));
+  }, []);
+  // 앞/뒤 카메라 전환
+  const flipCam = () => { const next = facingRef.current === "environment" ? "user" : "environment"; setFacing(next); setCamState("loading"); startCam(next); };
+
+  // 펫 초기 위치 = 화면 중앙 하단
+  useEffect(() => {
+    const el = wrapRef.current; if (!el) return;
+    setTf({ x: el.clientWidth/2, y: el.clientHeight*0.62, s:1, r:0 });
+  }, []);
+
+  // ── 제스처: 1손가락=이동, 2손가락=핀치 크기+회전. 탭(이동 없음)=모션 메뉴 토글 ──
+  const touchStart = (e) => {
+    e.preventDefault();
+    touchedAt.current = Date.now();
+    const ts = e.touches;
+    if (ts.length === 1) gRef.current = { mode:"move", sx:ts[0].clientX, sy:ts[0].clientY, base:{...tfRef.current}, moved:false };
+    else if (ts.length === 2) {
+      const [a,b]=ts, dist=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY), ang=Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)*180/Math.PI;
+      gRef.current = { mode:"pinch", dist, ang, base:{...tfRef.current}, moved:true };
+    }
+  };
+  const touchMove = (e) => {
+    e.preventDefault();
+    const g = gRef.current; if (!g) return;
+    const ts = e.touches;
+    if (g.mode==="move" && ts.length===1) {
+      const dx=ts[0].clientX-g.sx, dy=ts[0].clientY-g.sy;
+      if (Math.hypot(dx,dy)>4) g.moved=true;
+      setTf({ ...g.base, x:g.base.x+dx, y:g.base.y+dy });
+    } else if (g.mode==="pinch" && ts.length===2) {
+      const [a,b]=ts, dist=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY), ang=Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)*180/Math.PI;
+      setTf({ ...g.base, s:Math.max(0.3,Math.min(4, g.base.s*(dist/g.dist))), r:g.base.r+(ang-g.ang) });
+    }
+  };
+  const touchEnd = (e) => {
+    touchedAt.current = Date.now();
+    const g = gRef.current;
+    if (g && g.mode==="move" && !g.moved) setMenuOpen(o=>!o);
+    if (e.touches.length===0) gRef.current=null;
+  };
+  // 데스크톱 보조: 마우스 드래그=이동, 휠=크기, Shift+휠=회전. (터치 직후 합성 mouse 이벤트는 무시)
+  const isGhost = () => Date.now() - touchedAt.current < 700;
+  const mouseDown = (e) => { if(isGhost())return; gRef.current = { mode:"move", sx:e.clientX, sy:e.clientY, base:{...tfRef.current}, moved:false }; };
+  const mouseMove = (e) => { const g=gRef.current; if(!g||g.mode!=="move")return; const dx=e.clientX-g.sx,dy=e.clientY-g.sy; if(Math.hypot(dx,dy)>4)g.moved=true; setTf({...g.base,x:g.base.x+dx,y:g.base.y+dy}); };
+  const mouseUp = (e) => { if(isGhost())return; const g=gRef.current; if(g&&!g.moved) setMenuOpen(o=>!o); gRef.current=null; };
+  const wheel = (e) => { e.preventDefault(); const t=tfRef.current; if(e.shiftKey) setTf({...t,r:t.r+(e.deltaY>0?6:-6)}); else setTf({...t,s:Math.max(0.3,Math.min(4,t.s*(e.deltaY>0?0.94:1.06)))}); };
+
+  // ── 자이로 고정 AR: 폰 기울임에 따라 펫이 공간에 박힌 듯 반대로 이동. iOS는 권한 팝업(사용자 제스처) 필요 ──
+  const toggleAR = async () => {
+    if (arLock) {  // 끄기
+      if (orientRef.current) window.removeEventListener("deviceorientation", orientRef.current);
+      orientRef.current = null; baseRef.current = null; smoothRef.current = { dx:0, dy:0 }; setGyro({ dx:0, dy:0 }); setArLock(false);
+      return;
+    }
+    try {
+      const DOE = window.DeviceOrientationEvent;
+      if (DOE && typeof DOE.requestPermission === "function") {
+        if (await DOE.requestPermission() !== "granted") return;
+      }
+    } catch { return; }
+    // gamma(좌우 기울기)·beta(상하 기울기)만 사용 — alpha(나침반)는 위아래 기울일 때 요동쳐서 축이 섞임(짐벌락).
+    smoothRef.current = { dx:0, dy:0 };
+    const handler = (e) => {
+      const b=e.beta, g=e.gamma;
+      if (b==null && g==null) return;
+      if (!baseRef.current) { baseRef.current = { b, g }; return; }   // 첫 값=기준
+      const base = baseRef.current;
+      const K=6;                                          // 클램프 없음 → 많이 기울이면 펫이 화면 밖으로
+      const tx = ((g||0)-(base.g||0))*K;                  // 좌우 = gamma
+      const ty = ((b||0)-(base.b||0))*K;                  // 상하 = beta
+      const p = smoothRef.current;                                       // 저역통과(부드럽게)
+      const dx = p.dx + (tx-p.dx)*0.2, dy = p.dy + (ty-p.dy)*0.2;
+      smoothRef.current = { dx, dy };
+      setGyro({ dx, dy });
+    };
+    orientRef.current = handler;
+    window.addEventListener("deviceorientation", handler);
+    setArLock(true);
+  };
+  useEffect(() => () => { if (orientRef.current) window.removeEventListener("deviceorientation", orientRef.current); }, []);
+
+  // 위치 초기화 — 펫을 화면 중앙·기본 크기/회전으로, 자이로 기준도 현재 시점으로 재설정(못 찾을 때 복구)
+  const resetPet = () => {
+    const el = wrapRef.current;
+    if (el) setTf({ x: el.clientWidth/2, y: el.clientHeight*0.62, s:1, r:0 });
+    baseRef.current = null; smoothRef.current = { dx:0, dy:0 }; setGyro({ dx:0, dy:0 });
+  };
+
+  // ── 캡처: 카메라 프레임 + 펫(이동·크기·회전 반영) 합성 → 공유 또는 저장 ──
+  const capture = () => {
+    const video=videoRef.current, wrap=wrapRef.current, img=petImgRef.current;
+    if (!wrap) return;
+    const W=wrap.clientWidth, H=wrap.clientHeight, dpr=window.devicePixelRatio||1;
+    const cv=document.createElement("canvas"); cv.width=W*dpr; cv.height=H*dpr;
+    const ctx=cv.getContext("2d"); ctx.scale(dpr,dpr);
+    if (camState==="on" && video?.videoWidth) {  // 카메라 cover
+      const vw=video.videoWidth, vh=video.videoHeight, sc=Math.max(W/vw,H/vh), dw=vw*sc, dh=vh*sc;
+      ctx.drawImage(video,(W-dw)/2,(H-dh)/2,dw,dh);
+    } else { ctx.fillStyle="#cfd8dc"; ctx.fillRect(0,0,W,H); }
+    if (img && img.complete && img.naturalWidth) {
+      const t=tfRef.current, ar=img.naturalWidth/img.naturalHeight, w=AR_PET_BASE, h=AR_PET_BASE/ar;
+      ctx.save(); ctx.translate(t.x+gyro.dx, t.y+gyro.dy); ctx.rotate(t.r*Math.PI/180); ctx.scale(t.s,t.s);
+      ctx.drawImage(img,-w/2,-h/2,w,h); ctx.restore();
+    }
+    cv.toBlob(async (blob) => {
+      if (!blob) return;
+      const id = Date.now();
+      try { await savePhoto(blob, id); } catch {}
+      setPhotos(prev => [{ id, blob, url: URL.createObjectURL(blob) }, ...prev]);  // 보관함에 적재(즉시 저장 안 함)
+    }, "image/png");
+  };
+
+  // 사진 저장(다운로드) / 공유 / 삭제 — 전체보기에서 사용
+  const savePhotoFile = (p) => { const a=document.createElement("a"); a.href=p.url; a.download=`pet-ar-${p.id}.png`; a.click(); };
+  const sharePhoto = async (p) => {
+    try { const file=new File([p.blob], `pet-ar-${p.id}.png`, { type:"image/png" });
+      if (navigator.canShare?.({ files:[file] })) { await navigator.share({ files:[file], title:"내 펫 AR" }); return; } } catch {}
+    savePhotoFile(p);  // 공유 미지원/취소 시 저장으로 폴백
+  };
+  const removePhoto = async (p) => {
+    try { await deletePhoto(p.id); } catch {}
+    URL.revokeObjectURL(p.url);
+    setPhotos(prev => prev.filter(x => x.id !== p.id));
+    setViewerId(null);
+  };
+  const viewer = photos.find(p => p.id === viewerId) || null;
+
+  return (
+    <div ref={wrapRef} style={{position:"absolute",inset:0,overflow:"hidden",background:"#222",userSelect:"none",touchAction:"none"}}
+      onMouseMove={mouseMove} onMouseUp={mouseUp}>
+      <video ref={videoRef} playsInline muted autoPlay onClick={()=>setZoomOpen(false)} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",display:camState==="on"?"block":"none"}}/>
+      {camState!=="on" && (
+        <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,background:"linear-gradient(180deg,#90A4AE,#CFD8DC)",textAlign:"center",padding:24}}>
+          <div style={{fontSize:48}}>📷</div>
+          <p style={{color:"#37474F",fontSize:14,fontWeight:800,lineHeight:1.6}}>
+            {camState==="loading" ? "카메라를 켜는 중…" : "카메라를 사용할 수 없어요.\n권한을 허용했는지, HTTPS(또는 localhost)인지 확인해 주세요."}
+          </p>
+          <p style={{color:"#546E7A",fontSize:12}}>카메라 없이도 펫 배치·캡처는 가능해요(단색 배경).</p>
+        </div>
+      )}
+
+      {/* 펫 — 이동·크기·회전 (+ 자이로 오프셋) */}
+      <div style={{position:"absolute",left:tf.x+gyro.dx,top:tf.y+gyro.dy,transform:`translate(-50%,-50%) rotate(${tf.r}deg) scale(${tf.s})`,transformOrigin:"center",cursor:"grab",touchAction:"none"}}
+        onTouchStart={touchStart} onTouchMove={touchMove} onTouchEnd={touchEnd} onMouseDown={mouseDown} onWheel={wheel}>
+        <img ref={petImgRef} src={motionSrc} alt="" draggable={false}
+          onError={e => { if (e.currentTarget.src !== location.origin+fallbackSrc) e.currentTarget.src = fallbackSrc; }}
+          style={{width:AR_PET_BASE,height:"auto",display:"block",pointerEvents:"none",filter:"drop-shadow(0 8px 18px rgba(0,0,0,.4))"}}/>
+      </div>
+
+      {/* 모션 라디얼 메뉴 — 펫 중심 기준 원형 배치(펫 변형과 무관하게 고정 크기) */}
+      {menuOpen && (
+        <div style={{position:"absolute",left:tf.x+gyro.dx,top:tf.y+gyro.dy,width:0,height:0,zIndex:Z_UI.panel}}>
+          {AR_MOTIONS.map((m,i) => {
+            const a=(i/AR_MOTIONS.length)*Math.PI*2 - Math.PI/2, R=88;
+            return (
+              <button key={m.key} onClick={()=>{ setMotionKey(m.key); setMenuOpen(false); }}
+                style={{position:"absolute",left:Math.cos(a)*R,top:Math.sin(a)*R,transform:"translate(-50%,-50%)",
+                  width:48,height:48,borderRadius:"50%",border:motionKey===m.key?"2px solid #FFD200":"2px solid rgba(255,255,255,.7)",
+                  background:motionKey===m.key?"rgba(247,151,30,.92)":"rgba(0,0,0,.55)",backdropFilter:"blur(4px)",
+                  display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,cursor:"pointer",color:"#fff"}}>
+                <span style={{fontSize:18,lineHeight:1}}>{m.icon}</span>
+                <span style={{fontSize:8,fontWeight:800}}>{m.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 상단 바 */}
+      <div style={{position:"absolute",top:0,left:0,right:0,display:"flex",alignItems:"center",gap:8,padding:"12px 14px",zIndex:Z_UI.decorCtrl}}>
+        <button onClick={onBack} style={{background:"rgba(0,0,0,.45)",border:"none",borderRadius:18,padding:"7px 12px",color:"#fff",fontWeight:700,cursor:"pointer"}}>←</button>
+        <span style={{fontFamily:"'Jua',sans-serif",fontSize:15,color:"#fff",textShadow:"0 1px 4px rgba(0,0,0,.6)"}}>AR 카메라</span>
+        <button onClick={flipCam} title="앞/뒤 카메라 전환" style={{marginLeft:"auto",background:"rgba(0,0,0,.45)",border:"1.5px solid rgba(255,255,255,.4)",borderRadius:18,padding:"7px 11px",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer"}}>🪞</button>
+        <button onClick={resetPet} title="위치 초기화" style={{background:"rgba(0,0,0,.45)",border:"1.5px solid rgba(255,255,255,.4)",borderRadius:18,padding:"7px 11px",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer"}}>↺</button>
+        <button onClick={toggleAR} title="자이로 AR 고정" style={{background:arLock?"rgba(247,151,30,.92)":"rgba(0,0,0,.45)",border:arLock?"1.5px solid #FFD200":"1.5px solid rgba(255,255,255,.4)",borderRadius:18,padding:"7px 11px",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer"}}>🧭</button>
+      </div>
+      {/* 조작 힌트 */}
+      <div style={{position:"absolute",top:52,right:14,fontSize:10,color:"rgba(255,255,255,.85)",textShadow:"0 1px 4px rgba(0,0,0,.6)",textAlign:"right",lineHeight:1.4,zIndex:Z_UI.decorCtrl,pointerEvents:"none"}}>🪞앞뒤 · 🧭AR고정<br/>펫: 탭=모션 · 드래그=이동 · 두손가락=크기·회전</div>
+
+      {/* 줌 슬라이더 — 🔍 버튼으로 펼침, 배경 탭하면 닫힘 */}
+      {zoomOpen && zoomRange && (
+        <div style={{position:"absolute",bottom:104,left:16,right:16,zIndex:Z_UI.decorCtrl}}>
+          <label style={{display:"flex",alignItems:"center",gap:10,background:"rgba(0,0,0,.6)",backdropFilter:"blur(6px)",borderRadius:16,padding:"10px 16px",animation:"fadeUp .2s ease"}}>
+            <span style={{fontSize:16}}>🔍</span>
+            <input type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step||0.1} value={zoomVal}
+              onChange={e=>setZoom(Number(e.target.value))} style={{flex:1,accentColor:"#FFD200"}}/>
+            <span style={{fontSize:11,color:"#fff",fontWeight:700,width:38,textAlign:"right"}}>{Number(zoomVal).toFixed(1)}×</span>
+          </label>
+        </div>
+      )}
+
+      {/* 하단 캡처 버튼 (+ 왼쪽 줌 토글) */}
+      <div style={{position:"absolute",bottom:0,left:0,right:0,display:"flex",alignItems:"center",justifyContent:"center",padding:"18px",paddingBottom:"calc(18px + env(safe-area-inset-bottom,0px))",zIndex:Z_UI.decorCtrl}}>
+        {zoomRange && (
+          <button onClick={()=>setZoomOpen(o=>!o)} title="줌" style={{position:"absolute",left:32,bottom:26,width:48,height:48,borderRadius:"50%",border:zoomOpen?"2px solid #FFD200":"2px solid rgba(255,255,255,.6)",background:zoomOpen?"rgba(247,151,30,.92)":"rgba(0,0,0,.45)",color:"#fff",fontSize:20,cursor:"pointer"}}>🔍</button>
+        )}
+        <button onClick={capture} style={{width:68,height:68,borderRadius:"50%",border:"4px solid rgba(255,255,255,.85)",background:"rgba(255,255,255,.25)",backdropFilter:"blur(4px)",fontSize:26,cursor:"pointer"}}>📸</button>
+        {/* 보관함 썸네일(최신 사진) — 촬영 버튼 오른쪽 */}
+        {photos.length > 0 && (
+          <button onClick={()=>setGalleryOpen(true)} title="보관함" style={{position:"absolute",right:30,bottom:20,width:56,height:56,borderRadius:14,border:"2px solid rgba(255,255,255,.85)",overflow:"hidden",padding:0,cursor:"pointer",background:"#000",boxShadow:"0 2px 10px rgba(0,0,0,.45)"}}>
+            <img src={photos[0].url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+          </button>
+        )}
+      </div>
+
+      {/* 보관함 그리드 */}
+      {galleryOpen && (
+        <div style={{position:"absolute",inset:0,zIndex:10001,background:"rgba(10,8,20,.97)",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",flexShrink:0}}>
+            <button onClick={()=>setGalleryOpen(false)} style={{background:"rgba(255,255,255,.15)",border:"none",borderRadius:16,padding:"7px 14px",color:"#fff",fontWeight:700,cursor:"pointer"}}>← 닫기</button>
+            <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:18,color:"#fff"}}>📸 보관함</h2>
+            <span style={{marginLeft:"auto",fontSize:12,color:"rgba(255,255,255,.6)"}}>{photos.length}장</span>
+          </div>
+          {photos.length===0
+            ? <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,.5)",fontSize:14}}>아직 찍은 사진이 없어요</div>
+            : <div style={{flex:1,overflowY:"auto",padding:"0 12px 16px",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignContent:"start"}}>
+                {photos.map(p=>(
+                  <button key={p.id} onClick={()=>setViewerId(p.id)} style={{aspectRatio:"1",border:"none",padding:0,borderRadius:10,overflow:"hidden",cursor:"pointer",background:"#000"}}>
+                    <img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                  </button>
+                ))}
+              </div>
+          }
+        </div>
+      )}
+
+      {/* 전체보기 — 저장·공유·삭제 */}
+      {viewer && (
+        <div style={{position:"absolute",inset:0,zIndex:10002,background:"rgba(0,0,0,.95)",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",justifyContent:"flex-end",padding:"12px 16px",flexShrink:0}}>
+            <button onClick={()=>setViewerId(null)} style={{background:"rgba(255,255,255,.15)",border:"none",borderRadius:16,padding:"7px 13px",color:"#fff",fontWeight:700,cursor:"pointer"}}>✕</button>
+          </div>
+          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 12px",minHeight:0}}>
+            <img src={viewer.url} alt="" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",borderRadius:10}}/>
+          </div>
+          <div style={{display:"flex",gap:10,padding:"16px",justifyContent:"center",flexShrink:0}}>
+            <button onClick={()=>savePhotoFile(viewer)} style={{background:"rgba(255,255,255,.16)",border:"1.5px solid rgba(255,255,255,.4)",borderRadius:14,padding:"11px 18px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer"}}>💾 저장</button>
+            <button onClick={()=>sharePhoto(viewer)} style={{background:"linear-gradient(135deg,#26A69A,#4DB6AC)",border:"none",borderRadius:14,padding:"11px 18px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer"}}>📤 공유</button>
+            <button onClick={()=>removePhoto(viewer)} style={{background:"rgba(217,72,59,.85)",border:"none",borderRadius:14,padding:"11px 18px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer"}}>🗑️ 삭제</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
