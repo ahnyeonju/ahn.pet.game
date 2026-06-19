@@ -118,14 +118,19 @@ const TRAITS = {
   gluttonous:   { label: "식탐",   color: "#F4A261", emoji: "🍰" },
 };
 
+// 키 = 주 성향. 가장 높은 성향이 곧 최종 형태로 결정됨(determineFinalForm).
+// secondary는 동점 시 타이브레이크 + 설정 플레이버 용도. skill/skillEmoji는 미구현(표시만).
 const FINAL_FORMS = {
-  energetic:    { name: "장난꾸러기형", emoji: "🐱", primary: "energetic",    pMin: 8, secondary: "gluttonous",   sMin: 3, skill: "펫 챗봇",    skillEmoji: "💬", color: "#FF6B6B" },
-  intelligent:  { name: "똑똑형",      emoji: "🦉", primary: "intelligent",  pMin: 8, secondary: "energetic",    sMin: 3, skill: "꿈 해몽",    skillEmoji: "🌙", color: "#4ECDC4" },
-  affectionate: { name: "포근형",      emoji: "🐻", primary: "affectionate", pMin: 8, secondary: "intelligent",  sMin: 3, skill: "응원 메시지",skillEmoji: "🌸", color: "#FF8FA3" },
-  lucky:        { name: "신비형",      emoji: "🦄", primary: "lucky",        pMin: 8, secondary: "affectionate", sMin: 3, skill: "오늘의 운세",skillEmoji: "🔮", color: "#FFD93D" },
-  fashionable:  { name: "패션형",      emoji: "🦊", primary: "fashionable",  pMin: 8, secondary: "lucky",        sMin: 3, skill: "응원 메시지",skillEmoji: "👗", color: "#C77DFF" },
-  gluttonous:   { name: "먹보형",      emoji: "🐼", primary: "gluttonous",   pMin: 8, secondary: "fashionable",  sMin: 3, skill: "오늘의 운세",skillEmoji: "🍜", color: "#F4A261" },
+  energetic:    { name: "장난꾸러기형", emoji: "🐱", secondary: "gluttonous",   skill: "아재 개그",  skillEmoji: "😆", color: "#FF6B6B" },
+  intelligent:  { name: "똑똑형",      emoji: "🦉", secondary: "energetic",    skill: "꿈 해몽",    skillEmoji: "🌙", color: "#4ECDC4" },
+  affectionate: { name: "포근형",      emoji: "🐻", secondary: "intelligent",  skill: "응원 메시지",skillEmoji: "🌸", color: "#FF8FA3" },
+  lucky:        { name: "신비형",      emoji: "🦄", secondary: "affectionate", skill: "오늘의 운세",skillEmoji: "🔮", color: "#FFD93D" },
+  fashionable:  { name: "패션형",      emoji: "🦊", secondary: "lucky",        skill: "응원 메시지",skillEmoji: "👗", color: "#C77DFF" },
+  gluttonous:   { name: "먹보형",      emoji: "🐼", secondary: "fashionable",  skill: "오늘의 운세",skillEmoji: "🍜", color: "#F4A261" },
 };
+
+// 모든 3단계 펫이 공통 기본 탑재하는 기능. FINAL_FORMS.skill은 형태별 고유 스킬(기본 기능과 별개).
+const BASE_SKILL = { name: "펫 챗봇", emoji: "💬" };
 
 
 const EGG_OPTIONS = [
@@ -166,24 +171,46 @@ const RANDOM_EVENTS = [
 ];
 
 const WEATHER_LIST = ["sunny","rain","snow","cloudy"];
+// 날씨 메타(라벨·이모지). 하늘 색은 WEATHER_SKY 한 곳으로 일원화(창문·투명배경 백드롭 공유).
 const WEATHER_META = {
-  sunny:  { label:"맑음", emoji:"☀️", bg:"linear-gradient(170deg,#87CEEB 0%,#B8E4F9 40%,#D4F5C4 100%)" },
-  rain:   { label:"비",   emoji:"🌧️", bg:"linear-gradient(170deg,#607D8B 0%,#90A4AE 50%,#B0BEC5 100%)" },
-  snow:   { label:"눈",   emoji:"❄️", bg:"linear-gradient(170deg,#BBDEFB 0%,#E3F2FD 50%,#F5F5F5 100%)" },
-  cloudy: { label:"흐림", emoji:"☁️", bg:"linear-gradient(170deg,#B0BEC5 0%,#CFD8DC 60%,#ECEFF1 100%)" },
-  night:  { label:"밤",   emoji:"🌙", bg:"linear-gradient(170deg,#0D1B2A 0%,#1B2A4A 50%,#2A3B5A 100%)" },
-  sunset: { label:"노을", emoji:"🌅", bg:"linear-gradient(170deg,#FF7043 0%,#FFA726 50%,#FFE082 100%)" },
+  sunny:  { label:"맑음", emoji:"☀️" },
+  rain:   { label:"비",   emoji:"🌧️" },
+  snow:   { label:"눈",   emoji:"❄️" },
+  cloudy: { label:"흐림", emoji:"☁️" },
+  night:  { label:"밤",   emoji:"🌙" },
+  sunset: { label:"노을", emoji:"🌅" },
 };
 
-// 창문 너머 "바깥" 하늘 그라데이션. 기본 방 창문·상점 창문 유리가 공유.
+// 날씨 하늘 그라데이션 — 모든 날씨 표현의 단일 소스. 창문(WindowOutside·RoomBackground)·투명 배경 백드롭이 공유.
 const WEATHER_SKY = {
-  sunny:  'linear-gradient(180deg,#5BB8F5 0%,#A8D8F0 55%,#D4EFD0 100%)',
-  rain:   'linear-gradient(180deg,#3D5A66 0%,#6E96A4 100%)',
-  snow:   'linear-gradient(180deg,#9BBFE8 0%,#D9EDF9 100%)',
-  cloudy: 'linear-gradient(180deg,#7A98A4 0%,#C4D4DA 100%)',
-  night:  'linear-gradient(180deg,#08102A 0%,#152040 100%)',
-  sunset: 'linear-gradient(180deg,#C0300A 0%,#F4951A 55%,#FFD870 100%)',
+  sunny:  'linear-gradient(180deg,#7EC4F5 0%,#B8C6F0 52%,#FBD3E0 100%)',  // 파스텔 블루→라벤더→핑크
+  rain:   'linear-gradient(180deg,#8FA6C4 0%,#BCC9DC 100%)',             // 칙칙함↓, 부드러운 블루그레이
+  snow:   'linear-gradient(180deg,#C3D8F0 0%,#EEF5FC 100%)',             // 보송한 아이시 파스텔
+  cloudy: 'linear-gradient(180deg,#B6C0CF 0%,#E0E6EE 100%)',             // 밝은 라벤더그레이
+  night:  'linear-gradient(180deg,#2E2C54 0%,#5B4E86 55%,#B98AAE 100%)', // 드리미 트와일라잇(인디고→퍼플→핑크)
+  sunset: 'linear-gradient(180deg,#8FA8E0 0%,#F2B6C6 52%,#FFD9B0 100%)', // 파스텔 노을(블루→핑크→피치)
 };
+
+// 날씨별 하늘 이미지(선택) — 확장자 없는 "베이스 경로". 값을 비우면 그라데이션만 사용.
+// WEATHER_IMG_EXTS 순서대로 레이어를 쌓아, 존재하는 파일이 표시됨 → sunny.webp/png/jpg 아무거나 넣어도 동작.
+// 어떤 이미지도 없으면 WEATHER_SKY 그라데이션으로 폴백. WeatherFX(비·눈)는 항상 위에 유지.
+const WEATHER_IMG_EXTS = ["webp", "png", "jpg"];  // 우선순위 순(앞이 위 레이어). 확장자 추가 가능.
+const WEATHER_SKY_IMG = {
+  sunny:  "/images/weather/sunny",
+  rain:   "/images/weather/rain",
+  snow:   "/images/weather/snow",
+  cloudy: "/images/weather/cloudy",
+  night:  "/images/weather/night",
+  sunset: "/images/weather/sunset",
+};
+// 날씨 하늘의 CSS background 값 — 베이스 경로가 있으면 확장자별 url 레이어(존재하는 것만 표시) + 그라데이션 폴백.
+function weatherSky(weather) {
+  const grad = WEATHER_SKY[weather] || WEATHER_SKY.sunny;
+  const base = WEATHER_SKY_IMG[weather];
+  if (!base) return grad;
+  const layers = WEATHER_IMG_EXTS.map(ext => `url(${base}.${ext}) center/cover no-repeat`);
+  return `${layers.join(", ")}, ${grad}`;
+}
 
 // 밝은 날씨 배경 위 흰 글씨 가독성용 그림자(투명 UI 공통). 날씨 무관하게 대비 확보.
 const TEXT_SH = "0 1px 3px rgba(0,0,0,.7)";
@@ -326,17 +353,17 @@ function drawGift() {
 }
 
 function determineFinalForm(traits, giftHistory) {
-  // 주·부 성향 조건을 모두 충족하는 폼 목록 → 여러 개면 랜덤 선택
-  const qualifying = Object.entries(FINAL_FORMS).filter(([, form]) =>
-    traits[form.primary] >= form.pMin && traits[form.secondary] >= form.sMin
-  );
-  if (qualifying.length > 0) return qualifying[Math.floor(Math.random() * qualifying.length)][0];
-  // 조건 미충족 시 폴백: 최고 성향 기준, 동점이면 선물 이력 → 랜덤
+  // 가장 높은 성향이 곧 최종 형태(키=성향). 동점 시 부 성향 → 선물 이력 → 랜덤 순으로 타이브레이크.
   const maxVal = Math.max(...Object.values(traits));
   const tops = Object.keys(traits).filter(k => traits[k] === maxVal);
   if (tops.length === 1) return tops[0];
-  const lastTrait = [...giftHistory].reverse().find(g => tops.includes(g.trait))?.trait;
-  return lastTrait || tops[Math.floor(Math.random() * tops.length)];
+  // 1차: 후보들 중 각자의 부 성향 값이 가장 높은 쪽
+  const secMax = Math.max(...tops.map(k => traits[FINAL_FORMS[k].secondary]));
+  const secWinners = tops.filter(k => traits[FINAL_FORMS[k].secondary] === secMax);
+  if (secWinners.length === 1) return secWinners[0];
+  // 2차: 선물 이력에서 마지막으로 준 성향 → 그래도 없으면 랜덤
+  const lastTrait = [...giftHistory].reverse().find(g => secWinners.includes(g.trait))?.trait;
+  return lastTrait || secWinners[Math.floor(Math.random() * secWinners.length)];
 }
 
 const rollDailyEvent = () => Math.random() <= DAILY_EVENT_CHANCE
@@ -760,7 +787,7 @@ export default function App() {
   return (
     <>
       <style>{CSS}</style>
-      <div className="shell" style={{ background: screen!=="home" ? SCREEN_BG : wm.bg, transition:"background 1.2s ease" }}>
+      <div className="shell" style={{ background: screen!=="home" ? SCREEN_BG : weatherSky(weather), transition:"background 1.2s ease" }}>
         {toast && <Toast {...toast}/>}
 
         {screen==="egg_select" && <EggSelect onSelect={handleEggSelect}/>}
@@ -785,6 +812,9 @@ export default function App() {
         {screen==="collection"&&<Collection inv={inv} onBack={()=>setScreen("home")}/>}
         {screen==="shop"     && <Shop inv={inv} onBuy={handleShopBuy} onBack={()=>setScreen("home")}/>}
         {screen==="skill"    && <SkillScreen pet={pet} onBack={()=>setScreen("home")}/>}
+        {screen==="competition" && <PlaceholderScreen emoji="🏆" title="대회"     desc="다른 펫들과 실력을 겨루는 대회예요." onBack={()=>setScreen("home")}/>}
+        {screen==="outing"      && <PlaceholderScreen emoji="🎡" title="놀러가기" desc="펫과 함께 여러 장소로 놀러 가요."   onBack={()=>setScreen("home")}/>}
+        {screen==="social"      && <PlaceholderScreen emoji="👥" title="소셜"     desc="친구들과 펫을 자랑하고 교류해요."   onBack={()=>setScreen("home")}/>}
 
         {popup==="status"    && <StatusPopup pet={pet} growthMax={growthMax} canEvolve={canEvolve} onEvolve={handleEvolve} onNewPet={()=>setPopup("newpet")} onClose={()=>setPopup(null)} petName={getPetName()} petMotion={getPetMotion()} petEmoji={getPetEmoji()}/>}
         {popup==="newpet"    && <NewPetConfirmPopup petName={getPetName()} onConfirm={startNewPet} onCancel={()=>setPopup("status")}/>}
@@ -821,18 +851,22 @@ export default function App() {
 // 날씨 FX — 전체 화면 기준 파티클. 부모가 overflow:hidden이면 그 영역에만 클립됨.
 // ===================================================
 function WeatherFX({ weather }) {
+  // 음수 delay(-위상)로 로드 시 이미 떨어지는 중인 상태부터 시작 → 위에서 처음 떨어지는 어색함 제거.
+  // 위상은 각 파티클 주기에 황금비(0.618)로 분산해 화면 전체에 고르게 깔림.
   if (weather==="snow") return (
     <div style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden"}}>
-      {[...Array(16)].map((_,i)=>(
-        <div key={i} style={{position:"absolute",top:-10,left:`${5+i*6}%`,width:6,height:6,borderRadius:"50%",background:"rgba(255,255,255,.85)",animation:`snowfall ${2+i*.2}s linear ${i*.18}s infinite`}}/>
-      ))}
+      {[...Array(16)].map((_,i)=>{
+        const dur = 2 + i*.2, phase = ((i*.618)%1)*dur;
+        return <div key={i} style={{position:"absolute",top:-10,left:`${5+i*6}%`,width:6,height:6,borderRadius:"50%",background:"rgba(255,255,255,.85)",animation:`snowfall ${dur}s linear -${phase.toFixed(2)}s infinite`}}/>;
+      })}
     </div>
   );
   if (weather==="rain") return (
     <div style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden"}}>
-      {[...Array(22)].map((_,i)=>(
-        <div key={i} style={{position:"absolute",top:-10,left:`${i*4.5}%`,width:1.5,height:16,background:"rgba(180,220,255,.55)",animation:`rainfall ${.55+i*.03}s linear ${i*.06}s infinite`}}/>
-      ))}
+      {[...Array(22)].map((_,i)=>{
+        const dur = .55 + i*.03, phase = ((i*.618)%1)*dur;
+        return <div key={i} style={{position:"absolute",top:-10,left:`${i*4.5}%`,width:1.5,height:16,background:"rgba(180,220,255,.55)",animation:`rainfall ${dur}s linear -${phase.toFixed(2)}s infinite`}}/>;
+      })}
     </div>
   );
   return null;
@@ -842,7 +876,7 @@ function WeatherFX({ weather }) {
 // 날씨 파티클 필드는 컨테이너(방) 좌표에 정렬(fieldX/Y/W/H) → 모든 창문이 같은 하나의 하늘을 공유
 // (창문별 독립 파티클이 아니라 한 하늘의 다른 부분을 들여다봄). 프레임 PNG가 위(zIndex 1)에서 덮음.
 function WindowOutside({ weather, mask, fieldX, fieldY, fieldW, fieldH }) {
-  const sky = WEATHER_SKY[weather] || WEATHER_SKY.sunny;
+  const sky = weatherSky(weather);
   // 마스크는 창문 PNG와 같은 영역(inset:0)을 덮고 100% 100%로 정렬. 불투명 픽셀에서만 하늘이 보임.
   const maskStyle = {
     WebkitMaskImage:`url(${mask})`, maskImage:`url(${mask})`,
@@ -1514,7 +1548,7 @@ function HomeLayout({
         )}
       </div>
 
-      {!isDecorMode && <BottomBar daily={daily} inv={inv} onFeed={onFeed} onPlay={onPlay} onClean={onClean} onGiftNav={onGiftNav}/>}
+      {!isDecorMode && <BottomBar daily={daily} inv={inv} onFeed={onFeed} onPlay={onPlay} onClean={onClean} onGiftNav={onGiftNav} onNav={onNav}/>}
     </div>
   );
 }
@@ -1533,10 +1567,13 @@ function RoomBackground({ weather, scrollX, equippedBg }) {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  // 커스텀 배경 이미지가 장착된 경우 이미지로 대체
+  // 커스텀 배경 이미지가 장착된 경우 이미지로 대체.
+  // 이미지 뒤에 날씨 백드롭(창문과 동일한 WEATHER_SKY + WeatherFX) → 투명 영역(예: 바닥만 있는 PNG)으로 같은 날씨가 비침.
   if (equippedBg?.imagePath) {
     return (
       <div style={{position:"absolute",inset:0,overflow:"hidden",zIndex:0}}>
+        <div style={{position:"absolute",inset:0,background:weatherSky(weather)}}/>
+        <WeatherFX weather={weather}/>
         <img src={equippedBg.imagePath} alt=""
           style={{position:"absolute",top:0,bottom:0,left:0,width:"300%",height:"100%",
                   objectFit:"cover",display:"block",
@@ -1544,7 +1581,7 @@ function RoomBackground({ weather, scrollX, equippedBg }) {
       </div>
     );
   }
-  const skyBg = WEATHER_SKY[weather] || WEATHER_SKY.sunny;
+  const skyBg = weatherSky(weather);
 
   // 창문 6개: 배경(3x width)에서 0.25W, 0.75W, 1.25W, 1.75W, 2.25W, 2.75W 위치
   // 3x 기준 % → 8.33%, 25%, 41.67%, 58.33%, 75%, 91.67%
@@ -1791,24 +1828,48 @@ function RightPanel({ inv, pet, onNav }) {
 // ===================================================
 // 하단 바 (밥/놀기/청소/선물)
 // ===================================================
-function BottomBar({ daily, inv, onFeed, onPlay, onClean, onGiftNav }) {
-  const actions = [
+// 하단 바: [돌보기][대회][놀러가기][소셜]. 돌보기 탭 → 4개 돌보기 액션을 액션시트(바 위 팝업)로 펼침.
+function BottomBar({ daily, inv, onFeed, onPlay, onClean, onGiftNav, onNav }) {
+  const [careOpen, setCareOpen] = useState(false);
+  const careActions = [
     { emoji:"🍚", label:"밥 주기",   done:daily.missions.feed,  onClick:onFeed,   color:"#FF7043" },
     { emoji:"🎮", label:"놀아주기",  done:daily.missions.play,  onClick:onPlay,   color:"#42A5F5" },
     { emoji:"🛁", label:"청소하기",  done:daily.missions.clean, onClick:onClean,  color:"#66BB6A" },
     { emoji:"🎁", label:"선물주기",  done:daily.missions.gift,  onClick:onGiftNav,color:"#FFA726" },
   ];
+  const tabs = [
+    { emoji:"💗", label:"돌보기",   color:"#FF7043", active:careOpen, onClick:()=>setCareOpen(v=>!v) },
+    { emoji:"🏆", label:"대회",     color:"#AB47BC", onClick:()=>onNav("competition") },
+    { emoji:"🎡", label:"놀러가기", color:"#26A69A", onClick:()=>onNav("outing") },
+    { emoji:"👥", label:"소셜",     color:"#5C6BC0", onClick:()=>onNav("social") },
+  ];
   return (
-    <div style={{background:"rgba(80,40,20,.45)",backdropFilter:"blur(14px)",borderTop:"1.5px solid rgba(255,255,255,.15)",padding:"10px 12px 12px",display:"flex",gap:8,flexShrink:0}}>
-      {actions.map(a=>(
-        <button key={a.label} className="btn-action" onClick={a.onClick}
-          style={{flex:1,background:a.done?`${a.color}33`:`${a.color}44`,border:`1.5px solid ${a.done?`${a.color}66`:`${a.color}88`}`,borderRadius:18,padding:"10px 4px",opacity:a.done ? 0.88 : 1}}>
-          <span style={{fontSize:26,filter:a.done?"grayscale(.35)":"none"}}>{a.emoji}</span>
-          <span style={{fontSize:10,fontWeight:800,color:a.done?"rgba(255,255,255,.7)":"#fff"}}>{a.label}</span>
-          {/* 완료 줄을 항상 자리잡아 둠 (안 됐을 땐 숨김) → 완료돼도 바 높이 안 변함 */}
-          <span style={{fontSize:9,color:"#4ECB71",fontWeight:700,visibility:a.done?"visible":"hidden"}}>✓ 완료</span>
-        </button>
-      ))}
+    <div style={{position:"relative",flexShrink:0}}>
+      {/* 돌보기 액션시트 — 바 위로 펼침. 바깥 탭 시 닫힘 */}
+      {careOpen && (
+        <>
+          <div onClick={()=>setCareOpen(false)} style={{position:"fixed",inset:0,zIndex:40}}/>
+          <div style={{position:"absolute",bottom:"calc(100% + 6px)",left:8,right:8,zIndex:41,background:"rgba(80,40,20,.6)",backdropFilter:"blur(14px)",border:"1.5px solid rgba(255,255,255,.18)",borderRadius:18,padding:"8px",display:"flex",gap:8,animation:"fadeUp .2s ease"}}>
+            {careActions.map(a=>(
+              <button key={a.label} className="btn-action" onClick={()=>{ setCareOpen(false); a.onClick(); }}
+                style={{flex:1,background:a.done?`${a.color}33`:`${a.color}44`,border:`1.5px solid ${a.done?`${a.color}66`:`${a.color}88`}`,borderRadius:14,padding:"10px 4px",opacity:a.done?0.88:1}}>
+                <span style={{fontSize:24,filter:a.done?"grayscale(.35)":"none"}}>{a.emoji}</span>
+                <span style={{fontSize:10,fontWeight:800,color:a.done?"rgba(255,255,255,.7)":"#fff"}}>{a.label}</span>
+                <span style={{fontSize:9,color:"#4ECB71",fontWeight:700,visibility:a.done?"visible":"hidden"}}>✓ 완료</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <div style={{background:"rgba(80,40,20,.45)",backdropFilter:"blur(14px)",borderTop:"1.5px solid rgba(255,255,255,.15)",padding:"10px 12px 12px",display:"flex",gap:8}}>
+        {tabs.map(t=>(
+          <button key={t.label} className="btn-action" onClick={t.onClick}
+            style={{flex:1,background:t.active?`${t.color}66`:`${t.color}44`,border:`1.5px solid ${t.active?`${t.color}cc`:`${t.color}88`}`,borderRadius:18,padding:"10px 4px"}}>
+            <span style={{fontSize:26}}>{t.emoji}</span>
+            <span style={{fontSize:10,fontWeight:800,color:"#fff"}}>{t.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -2501,18 +2562,46 @@ function SkillScreen({ pet, onBack }) {
     <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:20,animation:"fadeUp .3s ease"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,alignSelf:"flex-start"}}>
         <button onClick={onBack} style={{background:PANEL_BTN,border:"none",borderRadius:20,padding:"8px 14px",color:INK,fontWeight:700,cursor:"pointer"}}>←</button>
-        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK}}>⚡ 고유 스킬</h2>
+        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK}}>⚡ 펫 스킬</h2>
       </div>
       {form&&(
-        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:18,width:"100%"}}>
-          <div style={{fontSize:76}}>{form.skillEmoji}</div>
-          <h3 style={{fontFamily:"'Jua',sans-serif",fontSize:22,color:INK}}>{form.skill}</h3>
-          <div style={{background:CARD_BG,border:`2px dashed ${CARD_BORDER}`,borderRadius:20,padding:"22px",width:"100%",textAlign:"center",backdropFilter:"blur(8px)"}}>
-            <div style={{fontSize:30,marginBottom:10}}>🔧</div>
-            <p style={{color:INK_SUB,fontSize:13,lineHeight:1.7}}>이 스킬은 향후 업데이트에서<br/>사용 가능해질 예정이에요.<br/><br/><span style={{color:form.color,fontWeight:700}}>"{form.name}"</span>의<br/><span style={{color:"#C8881A"}}>{form.skillEmoji} {form.skill}</span>을 기대해 주세요!</p>
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,width:"100%"}}>
+          {/* 기본 기능 — 모든 3단계 펫 공통 */}
+          <div style={{background:CARD_BG,border:`2px solid ${CARD_BORDER}`,borderRadius:20,padding:"18px",width:"100%",textAlign:"center",backdropFilter:"blur(8px)"}}>
+            <div style={{fontSize:11,fontWeight:700,color:INK_SUB,marginBottom:6}}>기본 기능 · 모든 펫 공통</div>
+            <div style={{fontSize:52}}>{BASE_SKILL.emoji}</div>
+            <h3 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK,marginTop:4}}>{BASE_SKILL.name}</h3>
+          </div>
+          {/* 고유 스킬 — 형태별 */}
+          <div style={{background:CARD_BG,border:`2px dashed ${CARD_BORDER}`,borderRadius:20,padding:"18px",width:"100%",textAlign:"center",backdropFilter:"blur(8px)"}}>
+            <div style={{fontSize:11,fontWeight:700,color:INK_SUB,marginBottom:6}}>고유 스킬 · <span style={{color:form.color}}>{form.name}</span> 전용</div>
+            <div style={{fontSize:52}}>{form.skillEmoji}</div>
+            <h3 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK,marginTop:4}}>{form.skill}</h3>
+            <p style={{color:INK_SUB,fontSize:12,marginTop:8}}>🔧 향후 업데이트에서 사용 가능해질 예정이에요.</p>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ===================================================
+// 미구현 기능 화면 (대회·놀러가기·소셜) — 구조만, "준비 중" 안내만 표시(P6). 로직은 "구현해줘" 시 작성.
+// ===================================================
+function PlaceholderScreen({ emoji, title, desc, onBack }) {
+  return (
+    <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",padding:20,animation:"fadeUp .3s ease"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,alignSelf:"flex-start"}}>
+        <button onClick={onBack} style={{background:PANEL_BTN,border:"none",borderRadius:20,padding:"8px 14px",color:INK,fontWeight:700,cursor:"pointer"}}>←</button>
+        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK}}>{emoji} {title}</h2>
+      </div>
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,width:"100%"}}>
+        <div style={{fontSize:80,opacity:.45}}>{emoji}</div>
+        <div style={{background:CARD_BG,border:`2px dashed ${CARD_BORDER}`,borderRadius:20,padding:"22px",width:"100%",textAlign:"center",backdropFilter:"blur(8px)"}}>
+          <div style={{fontSize:28,marginBottom:10}}>🔧</div>
+          <p style={{color:INK_SUB,fontSize:13,lineHeight:1.7}}>{desc}<br/><br/>준비 중인 기능이에요. 곧 만나요!</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2622,7 +2711,7 @@ function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onNewPet, onClose, p
               <button onClick={()=>setTipTrait(v=>!v)} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",borderRadius:"50%",width:18,height:18,fontSize:10,color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>?</button>
               {tipTrait&&(
                 <div style={{position:"absolute",right:0,top:"120%",background:"rgba(20,20,50,.97)",border:"1px solid rgba(255,255,255,.2)",borderRadius:12,padding:"10px 12px",width:200,zIndex:200,animation:"tooltipIn .2s ease",fontSize:11,color:"rgba(255,255,255,.8)",lineHeight:1.6}}>
-                  선물을 줄수록 해당 성향이 올라가요. 3단계 진화 시 가장 높은 성향에 따라 최종 캐릭터가 결정돼요. (주 성향 ≥8 + 부 성향 ≥3 필요)
+                  선물을 줄수록 해당 성향이 올라가요. 3단계 진화 시 가장 높은 성향(★)이 최종 캐릭터를 결정해요. 키우고 싶은 형태의 성향을 집중해서 올려보세요!
                   <button onClick={()=>setTipTrait(false)} style={{position:"absolute",top:4,right:6,background:"none",border:"none",color:"rgba(255,255,255,.4)",cursor:"pointer",fontSize:11}}>✕</button>
                 </div>
               )}
@@ -2632,7 +2721,6 @@ function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onNewPet, onClose, p
             const val = pet.traits[key];
             const isTop = val===maxTrait&&maxTrait>0;
             const form = FINAL_FORMS[key];
-            const pOk = val>=form.pMin, sVal=pet.traits[form.secondary], sOk=sVal>=form.sMin;
             return (
               <div key={key} style={{marginBottom:9}}>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
@@ -2643,8 +2731,8 @@ function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onNewPet, onClose, p
                   <div style={{width:`${Math.min(100,val*8)}%`,height:"100%",background:t.color,borderRadius:6,transition:"width .5s",opacity:isTop?1:.6}}/>
                 </div>
                 {pet.stage===2&&(
-                  <div style={{fontSize:9,color:"rgba(255,255,255,.35)",marginTop:2}}>
-                    {t.emoji}≥{form.pMin} {pOk?"✓":`(${val}/${form.pMin})`} · {TRAITS[form.secondary].emoji}≥{form.sMin} {sOk?"✓":`(${sVal}/${form.sMin})`}
+                  <div style={{fontSize:9,color:isTop?t.color:"rgba(255,255,255,.35)",marginTop:2}}>
+                    → {form.emoji} {form.name}
                   </div>
                 )}
               </div>
