@@ -53,3 +53,24 @@
 ## 튜닝 포인트
 - 펫 발 위치가 안 맞으면 `PET_BASE_Y` 조정.
 - 데코가 너무 일찍/늦게 앞으로 오면 같은 상수로 임계값 조정.
+
+---
+
+# 놀러가기 (멀티) — Phase 1: 오프라인 집 코드 방문
+
+## 결정 (사용자 확인됨)
+- 멀티는 **무서버·코드 기반**으로 간다. 외부 서비스(무료 티어 포함) 의존 금지 — 업체 소멸·과부하 위험 회피가 목적.
+- Phase 1 = 친구가 준 "집 코드"로 친구 집을 **읽기전용 방문**. (SNS 피드는 보류 — 공유 색인 필요해 무서버와 충돌)
+- 향후 Phase 2 = 온라인 라이브(둘 다 접속 시 펫 위치 완전 미러링). **WebRTC P2P + 코드 핸드셰이크 시그널링**으로 무서버 유지. 한계: 연결 코드 2회 교환(clunky), 엄격 NAT는 TURN 없이 실패. 펫 모션을 "원격 데이터 구동" 모드로 분리하는 게 주 작업.
+
+## 구현 (Phase 1)
+- `petDirOf/petEmojiOf/petNameOf/petImgOf/petMotionOf/petColorOf` — 펫 외형 순수 함수로 추출. App의 `getPet*`가 위임, 방문 렌더도 공유(DRY). (StatusPopup이 prop으로 petName/petMotion/petEmoji를 받아 충돌 → `Of` 접미사로 회피)
+- `makeVisitCode(egg,pet,inv)` / `parseVisitCode(code)` — 세이브 코드와 별개. 렌더 최소 데이터만: `{ v:1, egg, pet:{stage,finalForm,name}, bg(장착 배경 id), decos(placedDecos) }`. 세이브 코드와 동일하게 LZString 압축.
+- `VisitHome` — 홈 중앙 영역(RoomBackground+DecorationOverlay+WanderingPet+스크롤)만 재사용한 읽기전용 렌더. 상단/하단 바·패널·액션 없음. DecorationOverlay는 `draggable={false}`(홈 일반 모드와 동일 경로).
+- `OutingScreen`(screen `outing`) — "친구 집 방문"(코드 붙여넣기) + "내 집 코드"(복사). visit 상태면 VisitHome 렌더.
+
+## 주의 / 알려진 점
+- 방문 시 펫은 **로컬에서 자율 이동**(스냅샷 외형만, 실시간 동기화 아님 — Phase 2 영역). 방문자가 펫을 탭/드래그해도 **로컬 연출일 뿐 친구 데이터에 영향 없음**.
+- 친구가 보유한 배경/장식은 SHOP_MASTER(공유 마스터)에서 해석되므로 방문자 미보유여도 정상 렌더.
+- 코드 불러오기 실패 시 현재 상태 안 건드리고 에러 메시지만(세이브 코드 원칙과 동일).
+- localStorage 스키마 변경 없음 → 버전 유지(P2).

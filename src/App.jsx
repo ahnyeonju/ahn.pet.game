@@ -766,19 +766,10 @@ export default function App() {
     }
   };
 
-  const getPetEmoji = () => pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.emoji||"✨" : pet.stage===2?"🐣":"🥚";
-  const getPetName  = () => pet.name || (pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.name||`${pet.stage}단계` : `${pet.stage}단계`);
-  // 정적 이미지 경로: 모션과 동일 폴더 구조. 1·2단계는 알별, 3단계는 진화체별. 파일명 static.png.
-  const getPetImg   = () => { const dir = pet.stage===3&&pet.finalForm ? `stage3/${pet.finalForm}` : `${egg||"egg_red"}/stage${pet.stage}`; return `/images/pets/${dir}/static.png`; };
-  // 모션 경로: 1·2단계는 알별 pets/{알}/stage{N}/, 3단계는 진화체별 pets/stage3/{finalForm}/.
-  // stand·walk + 감정(PET_EMOTIONS) 키를 반환. 에셋 없는 키는 로드 실패 시 stand로 fallback.
-  const getPetMotion = () => {
-    const dir = pet.stage===3&&pet.finalForm ? `stage3/${pet.finalForm}` : `${egg||"egg_red"}/stage${pet.stage}`;
-    const m = { stand:`/images/pets/${dir}/stand.webp`, walk:`/images/pets/${dir}/walk.webp` };
-    PET_EMOTIONS.forEach(e => { m[e.motion] = `/images/pets/${dir}/${e.motion}.webp`; });
-    m.eat = `/images/pets/${dir}/eat.webp`;  // 먹기 모션(없으면 stand 폴백)
-    return m;
-  };
+  const getPetEmoji = () => petEmojiOf(pet);
+  const getPetName  = () => petNameOf(pet);
+  const getPetImg   = () => petImgOf(egg, pet);
+  const getPetMotion = () => petMotionOf(egg, pet);
 
   const growthMax = pet.stage===1 ? GROWTH_THRESHOLDS.stage2 : GROWTH_THRESHOLDS.stage3;
   const growthPct = Math.min(100,(pet.growthPoint/growthMax)*100);
@@ -813,7 +804,7 @@ export default function App() {
         {screen==="shop"     && <Shop inv={inv} onBuy={handleShopBuy} onBack={()=>setScreen("home")}/>}
         {screen==="skill"    && <SkillScreen pet={pet} onBack={()=>setScreen("home")}/>}
         {screen==="competition" && <PlaceholderScreen emoji="🏆" title="대회"     desc="다른 펫들과 실력을 겨루는 대회예요." onBack={()=>setScreen("home")}/>}
-        {screen==="outing"      && <PlaceholderScreen emoji="🎡" title="놀러가기" desc="펫과 함께 여러 장소로 놀러 가요."   onBack={()=>setScreen("home")}/>}
+        {screen==="outing"      && <OutingScreen egg={egg} pet={pet} inv={inv} weather={weather} onBack={()=>setScreen("home")}/>}
         {screen==="social"      && <PlaceholderScreen emoji="👥" title="소셜"     desc="친구들과 펫을 자랑하고 교류해요."   onBack={()=>setScreen("home")}/>}
 
         {popup==="status"    && <StatusPopup pet={pet} growthMax={growthMax} canEvolve={canEvolve} onEvolve={handleEvolve} onNewPet={()=>setPopup("newpet")} onClose={()=>setPopup(null)} petName={getPetName()} petMotion={getPetMotion()} petEmoji={getPetEmoji()}/>}
@@ -961,8 +952,22 @@ const PET_EMOTIONS = [
 // 먹기 모션 때 펫 옆에 뜨는 밥 아이콘. imgs를 순서대로 시도(png→webp), 전부 실패 시 emoji 폴백.
 const FOOD_ICON = { imgs: ["/images/icons/food.png", "/images/icons/food.webp"], emoji: "🍚" };
 
+// ── 펫 외형 순수 함수 (App의 getPet* 및 놀러가기 방문 렌더가 공유) ──
+function petDirOf(egg, pet) { return pet.stage===3&&pet.finalForm ? `stage3/${pet.finalForm}` : `${egg||"egg_red"}/stage${pet.stage}`; }
+function petEmojiOf(pet) { return pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.emoji||"✨" : pet.stage===2?"🐣":"🥚"; }
+function petNameOf(pet) { return pet.name || (pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.name||`${pet.stage}단계` : `${pet.stage}단계`); }
+function petImgOf(egg, pet) { return `/images/pets/${petDirOf(egg,pet)}/static.png`; }
+function petMotionOf(egg, pet) {
+  const dir = petDirOf(egg, pet);
+  const m = { stand:`/images/pets/${dir}/stand.webp`, walk:`/images/pets/${dir}/walk.webp` };
+  PET_EMOTIONS.forEach(e => { m[e.motion] = `/images/pets/${dir}/${e.motion}.webp`; });
+  m.eat = `/images/pets/${dir}/eat.webp`;
+  return m;
+}
+function petColorOf(pet) { return pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm].color : "#88d8b0"; }
+
 // 모션 에셋 유무를 확인해 wandering / 정적 fallback 결정
-function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji, petName, petColor, feedSignal }) {
+function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji, petName, petColor, feedSignal, homeBiasX = 0 }) {
   const [ready, setReady] = useState(null); // null=확인중, true=모션, false=정적fallback
   useEffect(() => {
     if (!motion?.stand || !motion?.walk) { setReady(false); return; }
@@ -978,7 +983,7 @@ function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji
   if (ready !== true) {
     // 정적 fallback — 기존 중앙 고정 펫과 동일 (모션 에셋 없는 폼)
     return (
-      <div style={{position:"absolute",left:"50%",bottom:"32%",transform:"translateX(-50%)",display:"flex",flexDirection:"column-reverse",alignItems:"center",gap:4,zIndex:Math.round(PET_BASE_Y),pointerEvents:"none",textAlign:"center"}}>
+      <div style={{position:"absolute",left:"50%",bottom:"32%",transform:`translateX(calc(-50% + ${homeBiasX}px))`,display:"flex",flexDirection:"column-reverse",alignItems:"center",gap:4,zIndex:Math.round(PET_BASE_Y),pointerEvents:"none",textAlign:"center"}}>
         <div style={{animation:"float 3s ease-in-out infinite",filter:`drop-shadow(0 8px 24px ${petColor}99)`,userSelect:"none"}}>
           <PetSprite size={96} emoji={staticEmoji} imgSrc={staticImg}/>
         </div>
@@ -986,10 +991,10 @@ function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji
       </div>
     );
   }
-  return <WanderingPetActive containerRef={containerRef} scrollXRef={scrollXRef} motion={motion} petName={petName} petColor={petColor} feedSignal={feedSignal}/>;
+  return <WanderingPetActive containerRef={containerRef} scrollXRef={scrollXRef} motion={motion} petName={petName} petColor={petColor} feedSignal={feedSignal} homeBiasX={homeBiasX}/>;
 }
 
-function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColor, feedSignal }) {
+function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColor, feedSignal, homeBiasX = 0 }) {
   const wrapRef = useRef(null), imgRef = useRef(null), bubbleRef = useRef(null), bubbleTextRef = useRef(null), foodRef = useRef(null);
   const feedSignalRef = useRef(feedSignal);
   useEffect(() => { feedSignalRef.current = feedSignal; }, [feedSignal]);  // 밥 신호를 루프가 ref로 읽음(루프 재시작 방지)
@@ -1126,7 +1131,7 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
     window.addEventListener("resize", resize);
 
     resize();
-    home = clampFloor((scrollXRef?.current || 0) + W / 2, H * 0.78);  // 초기 활동 중심 = 현재 보이는 방 중앙(월드)
+    home = clampFloor((scrollXRef?.current || 0) + W / 2 + homeBiasX, H * 0.78);  // 초기 활동 중심 = 현재 보이는 방 중앙(월드) + 오프셋
     pet.x = home.x; pet.y = home.y;
     idleUntil = now() + 500;
     rafId = requestAnimationFrame(tick);
@@ -2601,6 +2606,121 @@ function PlaceholderScreen({ emoji, title, desc, onBack }) {
           <div style={{fontSize:28,marginBottom:10}}>🔧</div>
           <p style={{color:INK_SUB,fontSize:13,lineHeight:1.7}}>{desc}<br/><br/>준비 중인 기능이에요. 곧 만나요!</p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ===================================================
+// 놀러가기 (Phase 1) — 친구 집 코드를 받아 읽기전용으로 렌더. 무서버·코드 기반.
+// ===================================================
+// 방문 코드: 친구 집 렌더에 필요한 최소 데이터(외형·배경·장식)만 LZString 압축. 세이브 코드와 별개.
+function makeVisitCode(egg, pet, inv) {
+  const bg = (SHOP_MASTER.find(i => i.category==="background" && inv.shopItems?.[i.id]?.equipped) || {}).id || null;
+  const payload = { v:1, egg, pet:{ stage:pet.stage, finalForm:pet.finalForm||null, name:pet.name||"" }, bg, decos: inv.placedDecos || [] };
+  return LZString.compressToBase64(JSON.stringify(payload));
+}
+function parseVisitCode(code) {
+  try {
+    const data = JSON.parse(LZString.decompressFromBase64((code||"").trim()));
+    if (!data || data.v !== 1 || !data.pet || typeof data.pet.stage !== "number") return null;
+    return data;
+  } catch { return null; }
+}
+
+// 친구 집 읽기전용 렌더 — 방 배경+장식+펫+스크롤만 재사용. 액션·패널·상단/하단 바 없음.
+function VisitHome({ data, myEgg, myPet, weather, onExit }) {
+  const egg = data.egg, vpet = data.pet;
+  const displayBg = SHOP_MASTER.find(i => i.id === data.bg) || null;
+  const displayDecos = (data.decos || [])
+    .map(p => ({ iid: p.iid, item: SHOP_MASTER.find(m => m.id === p.itemId), state: p }))
+    .filter(d => d.item);
+
+  const midRef = useRef(null);
+  const [scrollX, setScrollX] = useState(0);
+  const scrollXRef = useRef(0);
+  useEffect(() => { scrollXRef.current = scrollX; }, [scrollX]);
+  const dragRef = useRef({ active:false, startX:0, startScroll:0 });
+  const onTouchStart = (e) => { if (e.target.closest?.("[data-pet]")) return; dragRef.current = { active:true, startX:e.touches[0].clientX, startScroll:scrollX }; };
+  const onTouchMove  = (e) => { if (!dragRef.current.active) return; const w = midRef.current?.offsetWidth || 320; const d = dragRef.current.startX - e.touches[0].clientX; setScrollX(Math.max(0, Math.min(w*2, dragRef.current.startScroll + d))); };
+  const onTouchEnd   = () => { dragRef.current.active = false; };
+  useEffect(() => {
+    let raf;
+    const center = () => { const w = midRef.current?.offsetWidth || 0; if (w) setScrollX(w); else raf = requestAnimationFrame(center); };
+    center();
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, []);
+
+  return (
+    <div style={{height:"100%",display:"flex",flexDirection:"column",position:"relative",overflow:"hidden",animation:"fadeUp .3s ease"}}>
+      <div style={{flexShrink:0,display:"flex",alignItems:"center",gap:10,padding:"12px 14px",background:"rgba(80,40,20,.45)",backdropFilter:"blur(12px)",zIndex:Z_UI.panel}}>
+        <button onClick={onExit} style={{background:"rgba(255,255,255,.22)",border:"none",borderRadius:18,padding:"7px 14px",color:"#fff",fontWeight:700,cursor:"pointer",textShadow:TEXT_SH}}>← 나가기</button>
+        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:17,color:"#fff",textShadow:TEXT_SH}}>🏠 {petNameOf(vpet)}의 집</h2>
+        <span style={{marginLeft:"auto",fontSize:11,color:"rgba(255,255,255,.8)",textShadow:TEXT_SH}}>내 펫과 함께 구경</span>
+      </div>
+      <div ref={midRef} style={{flex:1,position:"relative",overflow:"hidden",minHeight:0}}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+        <RoomBackground weather={weather} scrollX={scrollX} equippedBg={displayBg}/>
+        {displayDecos.map(({ iid, item, state }) => (
+          <DecorationOverlay key={iid} item={item} itemState={state} containerRef={midRef} draggable={false} scrollX={scrollX} weather={weather}/>
+        ))}
+        {/* 집주인 펫 (방문 코드 외형) — 탭·드래그는 로컬 연출, 친구 데이터 불변 */}
+        <WanderingPet
+          containerRef={midRef} scrollXRef={scrollXRef}
+          motion={petMotionOf(egg, vpet)} staticImg={petImgOf(egg, vpet)} staticEmoji={petEmojiOf(vpet)}
+          petName={`${petNameOf(vpet)} *`} petColor={petColorOf(vpet)} feedSignal={0} homeBiasX={-70}
+        />
+        {/* 방문자(내) 펫 — 친구 집에 함께 등장. 돌보기 없음(상태 변화 없음) */}
+        {myPet && (
+          <WanderingPet
+            containerRef={midRef} scrollXRef={scrollXRef}
+            motion={petMotionOf(myEgg, myPet)} staticImg={petImgOf(myEgg, myPet)} staticEmoji={petEmojiOf(myPet)}
+            petName={petNameOf(myPet)} petColor={petColorOf(myPet)} feedSignal={0} homeBiasX={70}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 놀러가기 화면 — 내 집 코드 공유 + 친구 코드로 방문(읽기전용).
+function OutingScreen({ egg, pet, inv, weather, onBack }) {
+  const [myCode] = useState(() => makeVisitCode(egg, pet, inv));
+  const [input, setInput] = useState("");
+  const [visit, setVisit] = useState(null);
+  const [err, setErr] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const doCopy = () => { try { navigator.clipboard?.writeText(myCode); setCopied(true); setTimeout(()=>setCopied(false), 1500); } catch {} };
+  const doVisit = () => {
+    const data = parseVisitCode(input);
+    if (!data) { setErr("코드를 읽을 수 없어요. 다시 확인해 주세요."); return; }
+    setErr(""); setVisit(data);
+  };
+
+  if (visit) return <VisitHome data={visit} myEgg={egg} myPet={pet} weather={weather} onExit={()=>setVisit(null)}/>;
+
+  return (
+    <div style={{height:"100%",display:"flex",flexDirection:"column",padding:20,gap:16,animation:"fadeUp .3s ease",overflowY:"auto"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <button onClick={onBack} style={{background:PANEL_BTN,border:"none",borderRadius:20,padding:"8px 14px",color:INK,fontWeight:700,cursor:"pointer"}}>←</button>
+        <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:INK}}>🎡 놀러가기</h2>
+      </div>
+
+      <div style={{background:CARD_BG,border:`1.5px solid ${CARD_BORDER}`,borderRadius:18,padding:"16px"}}>
+        <div style={{fontWeight:800,color:INK,marginBottom:8}}>친구 집 방문</div>
+        <textarea value={input} onChange={e=>{ setInput(e.target.value); setErr(""); }} placeholder="친구가 준 집 코드를 붙여넣어요"
+          style={{width:"100%",boxSizing:"border-box",height:70,resize:"none",borderRadius:12,border:`1.5px solid ${CARD_BORDER}`,padding:"10px",fontSize:12,fontFamily:"monospace",color:INK,background:"rgba(255,255,255,.5)",outline:"none"}}/>
+        {err && <div style={{color:"#D9483B",fontSize:12,marginTop:6,fontWeight:700}}>{err}</div>}
+        <button onClick={doVisit} disabled={!input.trim()} style={{width:"100%",marginTop:10,background:input.trim()?"linear-gradient(135deg,#26A69A,#4DB6AC)":CARD_BG_DIM,border:"none",borderRadius:14,padding:"12px",fontSize:14,fontWeight:800,color:input.trim()?"#fff":INK_SUB,cursor:input.trim()?"pointer":"not-allowed",fontFamily:"'Jua',sans-serif"}}>방문하기</button>
+      </div>
+
+      <div style={{background:CARD_BG,border:`1.5px solid ${CARD_BORDER}`,borderRadius:18,padding:"16px"}}>
+        <div style={{fontWeight:800,color:INK,marginBottom:8}}>내 집 코드 (친구에게 공유)</div>
+        <textarea readOnly value={myCode} onFocus={e=>e.target.select()}
+          style={{width:"100%",boxSizing:"border-box",height:70,resize:"none",borderRadius:12,border:`1.5px solid ${CARD_BORDER}`,padding:"10px",fontSize:12,fontFamily:"monospace",color:INK_SUB,background:"rgba(255,255,255,.4)",outline:"none"}}/>
+        <button onClick={doCopy} style={{width:"100%",marginTop:10,background:CARD_BG_DIM,border:`1.5px solid ${CARD_BORDER}`,borderRadius:14,padding:"12px",fontSize:14,fontWeight:800,color:INK,cursor:"pointer",fontFamily:"'Jua',sans-serif"}}>{copied?"✓ 복사됨":"📋 코드 복사"}</button>
+        <p style={{color:INK_FAINT,fontSize:11,marginTop:8,lineHeight:1.6}}>이 코드를 친구에게 주면 친구가 내 집을 구경할 수 있어요. 외부 서버 없이 코드로만 동작해요.</p>
       </div>
     </div>
   );
