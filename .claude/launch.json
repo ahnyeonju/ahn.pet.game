@@ -3,8 +3,17 @@
   "configurations": [
     {
       "name": "dev",
+      "description": "개발 서버 (localhost only)",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
+      "port": 5173,
+      "autoPort": false
+    },
+    {
+      "name": "dev:phone",
+      "description": "폰 카메라 테스트용 (HTTPS + 외부 접근 허용)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:phone"],
       "port": 5173,
       "autoPort": false
     }
