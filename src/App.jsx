@@ -256,8 +256,8 @@ const SHOP_MASTER = [
   // 예시 (파일 추가 후 price/description 수정):
   { id:"bg_001", name:"오로라 설산", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_001.png", description:"신비로운 우주 배경" },
   { id:"bg_002", name:"크리스마스 배경", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_002.png", description:"크리스마스의 아늑한 배경" },
-{   id:"bg_003", name:"해질녘 바다", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_003.png", description:"노을이 지는 바닷가 배경" },
-  
+  { id:"bg_003", name:"따듯한 집안", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_003.png", description:"따뜻한 집안 배경" },
+  { id:"bg_004", name:"해질녘 바다", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_004.png", description:"노을이 지는 바닷가 배경" },  
 
   // ── decoration ───────────────────────────────────────────
   // 예시:
@@ -438,6 +438,10 @@ body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-conten
 @keyframes rainfall{0%{transform:translateY(-10px);opacity:1}100%{transform:translateY(100vh);opacity:.3}}
 @keyframes tooltipIn{from{opacity:0;transform:scale(.8) translateY(4px)}to{opacity:1;transform:scale(1) translateY(0)}}
 @keyframes confettiBurst{0%{transform:translate(-50%,-50%) rotate(0) scale(.3);opacity:0}8%{opacity:1}68%{opacity:1}100%{transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) rotate(var(--rot)) scale(.85);opacity:0}}
+@keyframes foamPop{from{transform:translate(-50%,-50%) scale(0);opacity:0}60%{transform:translate(-50%,-50%) scale(1.12)}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+@keyframes sprayFly{0%{transform:translate(-50%,-50%) rotate(var(--rot)) scaleY(.35);opacity:0}18%{opacity:.95}100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(var(--rot)) scaleY(1.2);opacity:0}}
+@keyframes sparkleTwinkle{0%{transform:translate(-50%,-50%) scale(0) rotate(0);opacity:0}40%{transform:translate(-50%,-50%) scale(1) rotate(25deg);opacity:1}100%{transform:translate(-50%,-50%) scale(0) rotate(60deg);opacity:0}}
+@keyframes sparkleLoop{0%,100%{transform:translate(-50%,-50%) scale(.35) rotate(0);opacity:.2}50%{transform:translate(-50%,-50%) scale(1) rotate(22deg);opacity:1}}
 .btn-action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;cursor:pointer;transition:transform .15s,opacity .15s;}
 .btn-action:active{transform:scale(.9);}
 .btn-side{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;cursor:pointer;transition:transform .15s;}
@@ -535,7 +539,7 @@ export default function App() {
   const handleClean = () => {
     setPet(p=>({...p,status:{...p.status,cleanness:Math.min(100,p.status.cleanness+MISSION_REWARDS.clean.statusGain)}}));
     const first = !devMode && !daily.missions.clean; if(first) markMissionDone("clean");
-    showToast(devMode ? "🔧 [DEV] 청소 효과 적용" : first ? "🛁 청소했어요! 미션에서 보상을 받으세요." : "🛁 깨끗해졌어요!");
+    showToast(devMode ? "🔧 [DEV] 씻기 효과 적용" : first ? "🛁 깨끗해졌어요! 미션에서 보상을 받으세요." : "🛁 깨끗해졌어요!");
   };
   const handleStatusCheck = () => { if(!devMode && !daily.missions.statusCheck) markMissionDone("statusCheck"); setPopup("status"); };
   const handlePlay = () => {
@@ -1207,7 +1211,7 @@ function EggSelect({ onSelect }) {
 // ===================================================
 // 홈 꾸미기 모드 장식품 오버레이
 // isFixed=false: 드래그 가능 / isFixed=true: 위치 고정
-function DecorationOverlay({ item, itemState, containerRef, draggable, onFixToggle, onRemove, onMove, onDragStart, scrollX = 0, weather }) {
+function DecorationOverlay({ item, itemState, containerRef, draggable, selected, onSelect, onFixToggle, onRemove, onMove, onDragStart, scrollX = 0, weather }) {
   const [localPos, setLocalPos] = useState(itemState.position);
   const dragRef = useRef({ active:false, startX:0, startY:0, startPos:{x:0,y:0} });
 
@@ -1234,7 +1238,9 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, onFixTogg
   const depthZ   = Math.round(Math.min(150, Math.max(1, baseY)));
 
   const handleTouchStart = (e) => {
-    if (!draggable || itemState.isFixed) return;
+    if (!draggable) return;
+    onSelect?.();                       // 탭한 데코만 선택(고정 여부 무관)
+    if (itemState.isFixed) return;      // 고정이면 드래그 안 함
     e.stopPropagation();
     onDragStart?.();
     const t = e.touches[0];
@@ -1262,6 +1268,8 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, onFixTogg
   };
 
   const fixed = itemState.isFixed;
+  // 조작 버튼은 기본 데코 위(top:-28). 데코가 화면 상단이라 위 공간이 부족하면 아래로 뒤집어 안 가려지게.
+  const flipBtnsBelow = box.h ? ((localPos.y/100)*box.h - (dispH||60)/2) < 44 : false;
 
   // 창문: 날씨 필드를 컨테이너(방) 좌표에 정렬 → 모든 창문이 같은 하늘을 공유(개별 파티클 X).
   // 마스크는 창문 래퍼(inset:0)를 덮으므로, 래퍼 좌상단을 컨테이너 px로 구해 그만큼 필드를 음수 오프셋한다.
@@ -1278,9 +1286,10 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, onFixTogg
       onTouchStart={draggable ? handleTouchStart : undefined}
       onTouchMove={draggable ? handleTouchMove : undefined}
       onTouchEnd={draggable ? handleTouchEnd : undefined}
+      onClick={draggable ? (e)=>{ e.stopPropagation(); onSelect?.(); } : undefined}
       style={{
         position:"absolute", left:`calc(${localPos.x}% - ${scrollX}px)`, top:`${localPos.y}%`,
-        transform:"translate(-50%,-50%)", zIndex:depthZ,
+        transform:"translate(-50%,-50%)", zIndex: selected ? Math.max(depthZ, 160) : depthZ,
         touchAction: (draggable && !fixed) ? "none" : "auto",
         userSelect:"none",
         pointerEvents: draggable ? "auto" : "none",
@@ -1300,10 +1309,10 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, onFixTogg
           </span>
         )}
 
-        {/* 꾸미기 모드에서만 조작 버튼 표시 */}
-        {draggable && (
+        {/* 꾸미기 모드 + 선택된 데코만 조작 버튼 표시 */}
+        {draggable && selected && (
           <div style={{
-            position:"absolute", top:-28, left:"50%", transform:"translateX(-50%)",
+            position:"absolute", top: flipBtnsBelow ? "calc(100% + 6px)" : -28, left:"50%", transform:"translateX(-50%)",
             display:"flex", gap:4, whiteSpace:"nowrap",
           }}>
             <button
@@ -1349,6 +1358,8 @@ function HomeLayout({
   const [draftDecos, setDraftDecos]           = useState({});          // {[iid]: {itemId, isFixed, position}}
   const [isDecorPanelOpen, setIsDecorPanelOpen] = useState(true);
   const [isDraggingDecor, setIsDraggingDecor] = useState(false);
+  const [selectedDecoIid, setSelectedDecoIid] = useState(null);  // 선택된 데코(이 데코만 조작 버튼 표시)
+  const [isCleanMode, setIsCleanMode] = useState(false);         // 청소 모드 오버레이
   const iidRef = useRef(0);  // 새 배치 인스턴스 iid 생성용 카운터
 
   const enterDecorMode = () => {
@@ -1362,17 +1373,20 @@ function HomeLayout({
     setIsDecorMode(true);
     setIsDecorPanelOpen(true);
     setIsDraggingDecor(false);
+    setSelectedDecoIid(null);   // 진입 시 아무것도 선택 안 됨(버튼 숨김)
   };
 
   const completeDecor = () => {
     onDecorSave(draftBg, draftDecos);
     setIsDecorMode(false);
+    setSelectedDecoIid(null);
   };
 
   const cancelDecor = () => {
     setIsDecorMode(false);
     setDraftBg(null);
     setDraftDecos({});
+    setSelectedDecoIid(null);
   };
 
   // draft 장식품 핸들러 — iid(인스턴스) 단위
@@ -1381,6 +1395,7 @@ function HomeLayout({
   };
   const handleDraftRemove = (iid) => {
     setDraftDecos(prev => { const n={...prev}; delete n[iid]; return n; });
+    setSelectedDecoIid(s => s === iid ? null : s);   // 삭제한 게 선택돼 있었으면 해제
   };
   const handleDraftMove = (iid, pos) => {
     setDraftDecos(prev => ({ ...prev, [iid]: { ...prev[iid], position: pos } }));
@@ -1395,6 +1410,7 @@ function HomeLayout({
     const x = w ? Math.max(DECOR_X.min, Math.min(DECOR_X.max, ((scrollX + w / 2) / w) * 100)) : 50;
     const iid = `${itemId}_${Date.now()}_${iidRef.current++}`;
     setDraftDecos(prev => ({ ...prev, [iid]: { itemId, isFixed: false, position: { x, y:placementBounds(cat).defY } } }));
+    setSelectedDecoIid(iid);   // 새로 놓은 데코 자동 선택(바로 조작 버튼 표시)
   };
 
   // 렌더에 사용할 배경 (꾸미기 모드면 draft, 아니면 실제 inv)
@@ -1465,6 +1481,8 @@ function HomeLayout({
             itemState={state}
             containerRef={midRef}
             draggable={isDecorMode}
+            selected={isDecorMode && selectedDecoIid === iid}
+            onSelect={isDecorMode ? () => setSelectedDecoIid(iid) : undefined}
             onFixToggle={isDecorMode ? () => handleDraftFixToggle(iid) : undefined}
             onRemove={isDecorMode ? () => handleDraftRemove(iid) : undefined}
             onMove={isDecorMode ? pos => handleDraftMove(iid, pos) : undefined}
@@ -1553,7 +1571,10 @@ function HomeLayout({
         )}
       </div>
 
-      {!isDecorMode && <BottomBar daily={daily} inv={inv} onFeed={onFeed} onPlay={onPlay} onClean={onClean} onGiftNav={onGiftNav} onNav={onNav}/>}
+      {!isDecorMode && <BottomBar daily={daily} inv={inv} onFeed={onFeed} onPlay={onPlay} onClean={()=>setIsCleanMode(true)} onGiftNav={onGiftNav} onNav={onNav}/>}
+
+      {/* 청소 모드 오버레이 — V 완료 시 기존 onClean(handleClean: 청결+미션) 재사용, X는 미커밋 */}
+      {isCleanMode && <CleaningOverlay petImg={getPetMotion().stand} petFallback={getPetImg()} onComplete={onClean} onExit={()=>setIsCleanMode(false)}/>}
     </div>
   );
 }
@@ -1839,7 +1860,7 @@ function BottomBar({ daily, inv, onFeed, onPlay, onClean, onGiftNav, onNav }) {
   const careActions = [
     { emoji:"🍚", label:"밥 주기",   done:daily.missions.feed,  onClick:onFeed,   color:"#FF7043" },
     { emoji:"🎮", label:"놀아주기",  done:daily.missions.play,  onClick:onPlay,   color:"#42A5F5" },
-    { emoji:"🛁", label:"청소하기",  done:daily.missions.clean, onClick:onClean,  color:"#66BB6A" },
+    { emoji:"🛁", label:"씻기기",    done:daily.missions.clean, onClick:onClean,  color:"#66BB6A" },
     { emoji:"🎁", label:"선물주기",  done:daily.missions.gift,  onClick:onGiftNav,color:"#FFA726" },
   ];
   const tabs = [
@@ -1857,10 +1878,11 @@ function BottomBar({ daily, inv, onFeed, onPlay, onClean, onGiftNav, onNav }) {
           <div style={{position:"absolute",bottom:"calc(100% + 6px)",left:8,right:8,zIndex:41,background:"rgba(80,40,20,.6)",backdropFilter:"blur(14px)",border:"1.5px solid rgba(255,255,255,.18)",borderRadius:18,padding:"8px",display:"flex",gap:8,animation:"fadeUp .2s ease"}}>
             {careActions.map(a=>(
               <button key={a.label} className="btn-action" onClick={()=>{ setCareOpen(false); a.onClick(); }}
-                style={{flex:1,background:a.done?`${a.color}33`:`${a.color}44`,border:`1.5px solid ${a.done?`${a.color}66`:`${a.color}88`}`,borderRadius:14,padding:"10px 4px",opacity:a.done?0.88:1}}>
+                style={{flex:1,position:"relative",background:a.done?`${a.color}33`:`${a.color}44`,border:`1.5px solid ${a.done?`${a.color}66`:`${a.color}88`}`,borderRadius:14,padding:"10px 4px",opacity:a.done?0.88:1}}>
                 <span style={{fontSize:24,filter:a.done?"grayscale(.35)":"none"}}>{a.emoji}</span>
                 <span style={{fontSize:10,fontWeight:800,color:a.done?"rgba(255,255,255,.7)":"#fff"}}>{a.label}</span>
-                <span style={{fontSize:9,color:"#4ECB71",fontWeight:700,visibility:a.done?"visible":"hidden"}}>✓ 완료</span>
+                {/* 완료 표시는 레이아웃 차지 없는 오버레이 → 없을 땐 이모지+라벨이 가운데 정렬 유지 */}
+                {a.done && <span style={{position:"absolute",bottom:3,left:0,right:0,textAlign:"center",fontSize:9,color:"#4ECB71",fontWeight:700}}>✓ 완료</span>}
               </button>
             ))}
           </div>
@@ -1872,6 +1894,189 @@ function BottomBar({ daily, inv, onFeed, onPlay, onClean, onGiftNav, onNav }) {
             style={{flex:1,background:t.active?`${t.color}66`:`${t.color}44`,border:`1.5px solid ${t.active?`${t.color}cc`:`${t.color}88`}`,borderRadius:18,padding:"10px 4px"}}>
             <span style={{fontSize:26}}>{t.emoji}</span>
             <span style={{fontSize:10,fontWeight:800,color:"#fff"}}>{t.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===================================================
+// 청소 모드 — 거품/샤워/빗질 도구로 펫을 문질러 청소(미니 인터랙션). home 오버레이.
+// 하나라도 완료하면 V 활성 → onComplete(기존 handleClean: 청결+미션). X는 미커밋.
+// ===================================================
+// img = 확장자 없는 베이스 경로. CLEAN_IMG_EXTS 순서로 시도 → 다 없으면 icon(이모지) 폴백. webp/png/jpg 무관.
+const CLEAN_IMG_EXTS = ["webp", "png", "jpg"];
+const CLEAN_TOOLS = [
+  { key:"foam",   icon:"🧽", label:"거품내기", img:"/images/clean/sponge" },
+  { key:"shower", icon:"🚿", label:"샤워",     img:"/images/clean/shower" },
+  { key:"brush",  icon:"🖌️", label:"빗질",     img:"/images/clean/brush" },
+];
+// 씻기 배경 — /images/clean/background.{webp,png,jpg} 있으면 사용, 없으면 그라데이션 폴백(CSS 다중 background).
+const CLEAN_BG_CSS = [
+  ...CLEAN_IMG_EXTS.map(ext => `url(/images/clean/background.${ext}) center/cover no-repeat`),
+  "linear-gradient(180deg,#BFE6F5 0%,#D9F0FA 55%,#EAF7FC 100%)",
+].join(", ");
+const CLEAN_TH = 1200;  // 도구별 완료 누적 드래그 px(조정 가능)
+
+// 도구 아이콘 — 베이스 경로에 확장자(webp→png→jpg) 차례로 시도, 다 실패 시 이모지 폴백
+function CleanToolIcon({ t, size }) {
+  const [extIdx, setExtIdx] = useState(0);
+  useEffect(() => { setExtIdx(0); }, [t.img]);
+  if (t.img && extIdx < CLEAN_IMG_EXTS.length)
+    return <img src={`${t.img}.${CLEAN_IMG_EXTS[extIdx]}`} alt="" draggable={false}
+      onError={()=>setExtIdx(i=>i+1)} style={{width:size,height:size,objectFit:"contain",display:"block"}}/>;
+  return <span style={{fontSize:Math.round(size*0.92),lineHeight:1}}>{t.icon}</span>;
+}
+
+function CleaningOverlay({ petImg, petFallback, onComplete, onExit }) {
+  const [tool, setTool] = useState("foam");
+  const [progress, setProgress] = useState({ foam:0, shower:0, brush:0 });
+  const [bubbles, setBubbles] = useState([]);    // 잔류 거품 {id,x,y,s}
+  const [fx, setFx] = useState([]);              // 물줄기·반짝임(단명) {id,x,y,kind}
+  const [cursor, setCursor] = useState(null);    // 도구 커서 {x,y}
+  const dragRef = useRef(false), lastRef = useRef(null), spawnRef = useRef(0), idRef = useRef(0);
+  const wrapRef = useRef(null), petRef = useRef(null);
+  const toolRef = useRef(tool); useEffect(() => { toolRef.current = tool; }, [tool]);  // 인터벌이 현재 도구 읽기용
+
+  const done = { foam: progress.foam>=CLEAN_TH, shower: progress.shower>=CLEAN_TH, brush: progress.brush>=CLEAN_TH };
+  const anyDone = done.foam || done.shower || done.brush;
+
+  // 빗질 누적 → 펫 둘레 반짝임 레벨(1~3). 진행도는 안 줄어드니 도구 바꿔도 유지됨.
+  const shineLevel = progress.brush>=CLEAN_TH ? 3 : progress.brush>=CLEAN_TH*0.6 ? 2 : progress.brush>=CLEAN_TH*0.3 ? 1 : 0;
+  const shineCount = [0,5,9,14][shineLevel];
+  // 반짝임 슬롯 — 황금각으로 사방 균등 배치(어떤 개수를 잘라도 한쪽에 안 몰림). 펫 둘레를 골고루 감쌈.
+  const [shineSlots] = useState(() => Array.from({ length:14 }, (_, i) => {
+    const a = i * 2.39996323;                          // 황금각(≈137.5°) → prefix도 균등
+    const rr = 0.74 + (i % 4) * 0.11 + Math.random()*0.1;  // 반경 다양(안쪽~둘레)
+    return { dx: Math.cos(a)*168*rr, dy: Math.sin(a)*150*rr, s: 14+Math.random()*12, dur: 1.1+Math.random()*0.8, delay: (i%7)*0.16 };
+  }));
+
+  const addFx = (x, y, kind, extra={}) => {
+    const id = idRef.current++;
+    setFx(f => [...f, { id, x, y, kind, ...extra }]);
+    setTimeout(() => setFx(f => f.filter(e => e.id !== id)), kind==="spray" ? 520 : 700);
+  };
+
+  // 샤워 분사(화면좌표 cx,cy) — 이동/홀드 공용. 펫 영역 안에서만.
+  const showerAt = (cx, cy) => {
+    const petBox = petRef.current?.getBoundingClientRect(), wrap = wrapRef.current?.getBoundingClientRect();
+    if (!petBox || !wrap) return;
+    const pcx=petBox.left+petBox.width/2, pcy=petBox.top+petBox.height/2, rx=petBox.width/2, ry=petBox.height/2;
+    if (((cx-pcx)/rx)**2 + ((cy-pcy)/ry)**2 > 1.05) return;
+    const x = cx - wrap.left, y = cy - wrap.top;
+    for (let i=0; i<5; i++) {                                  // 대각선(좌하향) 물줄기 다발
+      const ang = (130 + (Math.random()*40-20)) * Math.PI/180; // 중심 130°, ±20°
+      const dist = 52 + Math.random()*56;
+      addFx(x, y, "spray", { dx:Math.cos(ang)*dist, dy:Math.sin(ang)*dist, rot:ang*180/Math.PI-90 });
+    }
+    setBubbles(b => b.filter(bu => Math.hypot(bu.x-x, bu.y-y) > 28));  // 거품 씻겨나감 작을수록 더 적은 범위
+    setProgress(p => ({ ...p, shower: Math.min(CLEAN_TH, p.shower + 14) }));  // 홀드 중 진행
+  };
+  // 누르고 있는 동안 샤워 물 계속 분사(움직이지 않아도)
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (dragRef.current && toolRef.current==="shower" && lastRef.current) showerAt(lastRef.current.x, lastRef.current.y);
+    }, 55);
+    return () => clearInterval(id);
+  }, []);
+
+  const scrub = (cx, cy) => {
+    const petBox = petRef.current?.getBoundingClientRect(), wrap = wrapRef.current?.getBoundingClientRect();
+    if (!petBox || !wrap) return;
+    // 펫 영역(타원 근사) 안에서만 — 표면 마스킹
+    const pcx=petBox.left+petBox.width/2, pcy=petBox.top+petBox.height/2, rx=petBox.width/2, ry=petBox.height/2;
+    if (((cx-pcx)/rx)**2 + ((cy-pcy)/ry)**2 > 1.05) return;
+    const x = cx - wrap.left, y = cy - wrap.top;
+    const last = lastRef.current; const d = last ? Math.hypot(cx-last.x, cy-last.y) : 0;
+    // 스폰 간격 제한(누적 18px마다)
+    spawnRef.current += d;
+    const emit = spawnRef.current >= 18; if (emit) spawnRef.current = 0;
+    if (tool==="foam" && emit) {
+      setBubbles(b => [...b.slice(-44), { id:idRef.current++, x, y, s:22+Math.random()*22 }]);
+    } else if (tool==="brush" && emit) {
+      addFx(x + (Math.random()*40-20), y + (Math.random()*40-20), "sparkle");
+    }
+    // 샤워는 인터벌이 홀드 중 계속 처리 → 여기선 분사·진행 안 함
+    if (tool!=="shower" && last) setProgress(p => {
+      const nv = Math.min(CLEAN_TH, p[tool] + d);
+      return nv === p[tool] ? p : { ...p, [tool]: nv };
+    });
+  };
+
+  const pos = (e) => { const t = e.touches?.[0]; return { x:(t||e).clientX, y:(t||e).clientY }; };
+  const down = (e) => { dragRef.current = true; const p = pos(e); lastRef.current = p; scrub(p.x, p.y); };
+  const move = (e) => {
+    const p = pos(e); const wrap = wrapRef.current?.getBoundingClientRect();
+    if (wrap) setCursor({ x:p.x-wrap.left, y:p.y-wrap.top });
+    if (dragRef.current) { scrub(p.x, p.y); lastRef.current = p; }
+  };
+  const up = () => { dragRef.current = false; lastRef.current = null; };
+
+  const cur = CLEAN_TOOLS.find(t => t.key===tool);
+
+  return (
+    <div ref={wrapRef}
+      onTouchStart={down} onTouchMove={e=>{e.preventDefault();move(e);}} onTouchEnd={up}
+      onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
+      style={{position:"absolute",inset:0,zIndex:Z_UI.decorCtrl,overflow:"hidden",touchAction:"none",cursor:"none",
+        background:CLEAN_BG_CSS}}>
+
+      {/* 펫 (중앙 고정 정적) */}
+      <div style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",pointerEvents:"none"}}>
+        <img ref={petRef} src={petImg} alt="" draggable={false}
+          onError={e => { if (petFallback && e.currentTarget.src !== location.origin+petFallback) e.currentTarget.src = petFallback; }}
+          style={{width:200,height:"auto",display:"block",filter:"drop-shadow(0 10px 22px rgba(0,0,0,.25))"}}/>
+      </div>
+
+      {/* 펫 둘레 반짝임 — 빗질 누적 레벨(1~3)로 개수↑. 도구 바꿔도 유지(progress.brush 기반) */}
+      {shineSlots.slice(0, shineCount).map((s, i) => (
+        <div key={i} style={{position:"absolute",left:`calc(50% + ${s.dx}px)`,top:`calc(50% + ${s.dy}px)`,
+          fontSize:s.s,color:"#fff",textShadow:"0 0 8px #fff,0 0 5px #BFE6F5",pointerEvents:"none",lineHeight:1,
+          animation:`sparkleLoop ${s.dur}s ease-in-out ${s.delay}s infinite`}}>✦</div>
+      ))}
+
+      {/* 잔류 거품 — 폭신한 흰 덩어리 */}
+      {bubbles.map(b => (
+        <div key={b.id} style={{position:"absolute",left:b.x,top:b.y,width:b.s,height:b.s,transform:"translate(-50%,-50%)",
+          borderRadius:"50%",background:"radial-gradient(circle at 38% 34%,#fff 0%,#fff 58%,rgba(255,255,255,.72) 100%)",
+          boxShadow:"0 0 0 3px rgba(255,255,255,.55), 6px 2px 0 -2px rgba(255,255,255,.85), -6px 3px 0 -2px rgba(255,255,255,.8)",
+          animation:"foamPop .25s ease",pointerEvents:"none"}}/>
+      ))}
+
+      {/* 단명 이펙트 — 물줄기(대각선 분사) / 반짝임 */}
+      {fx.map(e => e.kind==="spray" ? (
+        <div key={e.id} style={{position:"absolute",left:e.x,top:e.y,width:4,height:24,transformOrigin:"center",
+          "--dx":`${e.dx}px`,"--dy":`${e.dy}px`,"--rot":`${e.rot}deg`,
+          borderRadius:4,background:"linear-gradient(180deg,rgba(150,222,255,.95),rgba(205,242,255,.08))",
+          animation:"sprayFly .5s ease-out forwards",pointerEvents:"none"}}/>
+      ) : (
+        <div key={e.id} style={{position:"absolute",left:e.x,top:e.y,fontSize:22,transform:"translate(-50%,-50%)",
+          color:"#fff",textShadow:"0 0 8px #fff,0 0 4px #BFE6F5",animation:"sparkleTwinkle .7s ease forwards",pointerEvents:"none"}}>✦</div>
+      ))}
+
+      {/* 도구 커서 */}
+      {cursor && <div style={{position:"absolute",left:cursor.x,top:cursor.y,transform:"translate(-50%,-50%)",pointerEvents:"none",filter:"drop-shadow(0 2px 4px rgba(0,0,0,.35))"}}><CleanToolIcon t={cur} size={70}/></div>}
+
+      {/* 상단: X 종료 / V 완료 */}
+      <div style={{position:"absolute",top:0,left:0,right:0,display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",pointerEvents:"none"}}>
+        <button onClick={onExit} style={{pointerEvents:"auto",width:42,height:42,borderRadius:"50%",border:"none",background:"rgba(0,0,0,.4)",color:"#fff",fontSize:18,fontWeight:800,cursor:"pointer"}}>✕</button>
+        <span style={{fontFamily:"'Jua',sans-serif",fontSize:15,color:"#3A6B82",textShadow:"0 1px 3px rgba(255,255,255,.7)"}}>🫧 씻기기</span>
+        <button onClick={()=>{ if(anyDone){ onComplete(); onExit(); } }} disabled={!anyDone}
+          style={{pointerEvents:"auto",width:42,height:42,borderRadius:"50%",border:"none",background:anyDone?"linear-gradient(135deg,#4CAF50,#8BC34A)":"rgba(0,0,0,.25)",color:"#fff",fontSize:20,fontWeight:800,cursor:anyDone?"pointer":"not-allowed",boxShadow:anyDone?"0 3px 12px rgba(76,175,80,.5)":"none"}}>✓</button>
+      </div>
+
+      {/* 하단: 도구 3개 (자유 전환, 선택 강조, 완료 ✓) */}
+      <div style={{position:"absolute",bottom:0,left:0,right:0,display:"flex",justifyContent:"center",gap:14,padding:"16px",paddingBottom:"calc(16px + env(safe-area-inset-bottom,0px))"}}>
+        {CLEAN_TOOLS.map(t => (
+          <button key={t.key} onClick={()=>setTool(t.key)}
+            style={{position:"relative",width:62,height:62,borderRadius:18,cursor:"pointer",
+              border: tool===t.key?"3px solid #FFD200":"2px solid rgba(255,255,255,.7)",
+              background: tool===t.key?"rgba(247,151,30,.92)":"rgba(0,0,0,.4)",
+              display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,color:"#fff"}}>
+            <CleanToolIcon t={t} size={26}/>
+            <span style={{fontSize:9,fontWeight:800}}>{t.label}</span>
+            {done[t.key] && <span style={{position:"absolute",top:-6,right:-6,width:20,height:20,borderRadius:"50%",background:"#4CAF50",color:"#fff",fontSize:12,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>✓</span>}
           </button>
         ))}
       </div>
@@ -1918,7 +2123,7 @@ function MissionScreen({ daily, onClaim, onBack }) {
   const missions = [
     { key:"feed",        emoji:"🍚", label:"밥 주기",         rewardIcon:"🌱", rewardLabel:mult?`성장 +${MISSION_REWARDS.feed.growth*2} (2배)`:`성장 +${MISSION_REWARDS.feed.growth}` },
     { key:"play",        emoji:"🎮", label:"놀아주기",        rewardIcon:"🌿", rewardLabel:mult?`성장 +${MISSION_REWARDS.play.growth*2} (2배)`:`성장 +${MISSION_REWARDS.play.growth}` },
-    { key:"clean",       emoji:"🛁", label:"청소하기",        rewardIcon:"🌱", rewardLabel:mult?`성장 +${MISSION_REWARDS.clean.growth*2} (2배)`:`성장 +${MISSION_REWARDS.clean.growth}` },
+    { key:"clean",       emoji:"🛁", label:"씻기기",          rewardIcon:"🌱", rewardLabel:mult?`성장 +${MISSION_REWARDS.clean.growth*2} (2배)`:`성장 +${MISSION_REWARDS.clean.growth}` },
     { key:"gift",        emoji:"🎁", label:"선물주기",        rewardIcon:"💰", rewardLabel:`재화 +${MISSION_REWARDS.gift.currency}` },
     { key:"statusCheck", emoji:"💖", label:"내 펫 상태 확인", rewardIcon:"💰", rewardLabel:`재화 +${MISSION_REWARDS.statusCheck.currency}` },
   ];
@@ -3161,7 +3366,7 @@ function StatusPopup({ pet, growthMax, canEvolve, onEvolve, onNewPet, onClose, p
               <button onClick={()=>setTipStatus(v=>!v)} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",borderRadius:"50%",width:18,height:18,fontSize:10,color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>?</button>
               {tipStatus&&(
                 <div style={{position:"absolute",right:0,top:"120%",background:"rgba(20,20,50,.97)",border:"1px solid rgba(255,255,255,.2)",borderRadius:12,padding:"10px 12px",width:190,zIndex:200,animation:"tooltipIn .2s ease",fontSize:11,color:"rgba(255,255,255,.8)",lineHeight:1.6}}>
-                  배고픔·기분·청결은 시간이 지나면 감소해요. 밥주기·놀아주기·청소하기로 채울 수 있어요. 게임 성장에는 직접 영향을 주지 않아요.
+                  배고픔·기분·청결은 시간이 지나면 감소해요. 밥주기·놀아주기·씻기기로 채울 수 있어요. 게임 성장에는 직접 영향을 주지 않아요.
                   <button onClick={()=>setTipStatus(false)} style={{position:"absolute",top:4,right:6,background:"none",border:"none",color:"rgba(255,255,255,.4)",cursor:"pointer",fontSize:11}}>✕</button>
                 </div>
               )}
