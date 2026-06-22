@@ -1876,15 +1876,19 @@ function BottomBar({ daily, inv, onFeed, onPlay, onClean, onGiftNav, onNav }) {
         <>
           <div onClick={()=>setCareOpen(false)} style={{position:"fixed",inset:0,zIndex:40}}/>
           <div style={{position:"absolute",bottom:"calc(100% + 6px)",left:8,right:8,zIndex:41,background:"rgba(80,40,20,.6)",backdropFilter:"blur(14px)",border:"1.5px solid rgba(255,255,255,.18)",borderRadius:18,padding:"8px",display:"flex",gap:8,animation:"fadeUp .2s ease"}}>
-            {careActions.map(a=>(
-              <button key={a.label} className="btn-action" onClick={()=>{ setCareOpen(false); a.onClick(); }}
-                style={{flex:1,position:"relative",background:a.done?`${a.color}33`:`${a.color}44`,border:`1.5px solid ${a.done?`${a.color}66`:`${a.color}88`}`,borderRadius:14,padding:"10px 4px",opacity:a.done?0.88:1}}>
-                <span style={{fontSize:24,filter:a.done?"grayscale(.35)":"none"}}>{a.emoji}</span>
-                <span style={{fontSize:10,fontWeight:800,color:a.done?"rgba(255,255,255,.7)":"#fff"}}>{a.label}</span>
-                {/* 완료 표시는 레이아웃 차지 없는 오버레이 → 없을 땐 이모지+라벨이 가운데 정렬 유지 */}
-                {a.done && <span style={{position:"absolute",bottom:3,left:0,right:0,textAlign:"center",fontSize:9,color:"#4ECB71",fontWeight:700}}>✓ 완료</span>}
-              </button>
-            ))}
+            {careActions.map(a=>{
+              const hasDone = careActions.some(x=>x.done);
+              const labelStyle = {fontSize:10,fontWeight:800,color:a.done?"rgba(255,255,255,.7)":"#fff",lineHeight:1.2};
+              if (a.done && hasDone) Object.assign(labelStyle, {maxHeight:"12px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:"16px"});
+              return (
+                <button key={a.label} className="btn-action" onClick={()=>{ setCareOpen(false); a.onClick(); }}
+                  style={{flex:1,position:"relative",background:a.done?`${a.color}33`:`${a.color}44`,border:`1.5px solid ${a.done?`${a.color}66`:`${a.color}88`}`,borderRadius:14,padding:"10px 4px",opacity:a.done?0.88:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"2px",minHeight:68}}>
+                  <span style={{fontSize:24,filter:a.done?"grayscale(.35)":"none",flexShrink:0}}>{a.emoji}</span>
+                  <span style={labelStyle}>{a.label}</span>
+                  {a.done && <span style={{position:"absolute",bottom:3,left:0,right:0,textAlign:"center",fontSize:9,color:"#4ECB71",fontWeight:700}}>✓ 완료</span>}
+                </button>
+              );
+            })}
           </div>
         </>
       )}
