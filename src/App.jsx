@@ -121,12 +121,12 @@ const TRAITS = {
 // 키 = 주 성향. 가장 높은 성향이 곧 최종 형태로 결정됨(determineFinalForm).
 // secondary는 동점 시 타이브레이크 + 설정 플레이버 용도. skill/skillEmoji는 미구현(표시만).
 const FINAL_FORMS = {
-  energetic:    { name: "장난꾸러기형", emoji: "🐱", secondary: "gluttonous",   skill: "아재 개그",  skillEmoji: "😆", color: "#FF6B6B" },
-  intelligent:  { name: "똑똑형",      emoji: "🦉", secondary: "energetic",    skill: "꿈 해몽",    skillEmoji: "🌙", color: "#4ECDC4" },
-  affectionate: { name: "포근형",      emoji: "🐻", secondary: "intelligent",  skill: "응원 메시지",skillEmoji: "🌸", color: "#FF8FA3" },
-  lucky:        { name: "신비형",      emoji: "🦄", secondary: "affectionate", skill: "오늘의 운세",skillEmoji: "🔮", color: "#FFD93D" },
-  fashionable:  { name: "패션형",      emoji: "🦊", secondary: "lucky",        skill: "응원 메시지",skillEmoji: "👗", color: "#C77DFF" },
-  gluttonous:   { name: "먹보형",      emoji: "🐼", secondary: "fashionable",  skill: "오늘의 운세",skillEmoji: "🍜", color: "#F4A261" },
+  energetic:    { name: "장난꾸러기형", emoji: "🐱", secondary: "gluttonous",   skill: "장난치기",  skillEmoji: "😆", color: "#FF6B6B", shopUnlocks: ["bg_001", "win_001", "deco_001"] },
+  intelligent:  { name: "똑똑형",      emoji: "🦉", secondary: "energetic",    skill: "꿈 해몽",    skillEmoji: "🌙", color: "#4ECDC4", shopUnlocks: ["bg_002", "win_002", "deco_001"] },
+  affectionate: { name: "포근형",      emoji: "🐻", secondary: "intelligent",  skill: "응원 메시지",skillEmoji: "🌸", color: "#FF8FA3", shopUnlocks: ["bg_003", "win_001", "deco_001"] },
+  lucky:        { name: "신비형",      emoji: "🦄", secondary: "affectionate", skill: "오늘의 운세",skillEmoji: "🔮", color: "#FFD93D", shopUnlocks: ["bg_004", "win_002", "deco_001"] },
+  fashionable:  { name: "패션형",      emoji: "🦊", secondary: "lucky",        skill: "행운의 컬러",skillEmoji: "👗", color: "#C77DFF", shopUnlocks: ["bg_001", "win_002", "deco_001"] },
+  gluttonous:   { name: "먹보형",      emoji: "🐼", secondary: "fashionable",  skill: "오늘 뭐 먹을까?",skillEmoji: "🍜", color: "#F4A261", shopUnlocks: ["bg_002", "win_001", "deco_001"] },
 };
 
 // 모든 3단계 펫이 공통 기본 탑재하는 기능. FINAL_FORMS.skill은 형태별 고유 스킬(기본 기능과 별개).
@@ -242,6 +242,24 @@ const GIFT_SHOP_ITEMS = GIFT_MASTER.map(g => ({
   description: `${TRAITS[g.trait].label} 성향 +${g.val} · ${GIFT_GRADE_LABEL[g.grade]} 선물`,
 }));
 
+// 진화형별 전용 상점 아이템. inv.formEvents[formKey].shopEventDone이 true일 때만 상점에 노출됨.
+// asset은 확장자 없는 경로 — ShopItemImage가 webp/png/jpg 순으로 시도.
+// 아이템 추가 시 이 배열에만 추가하면 Shop·구매·저장 모두 자동 반영.
+const FORM_SHOP_ITEMS = [
+  { id:"bg_energetic_001",     formKey:"energetic",    category:"background", name:"활기찬 놀이터",    price:40, asset:"/images/shop/backgrounds/bg_energetic_001",     description:"장난꾸러기형 전용 활기찬 놀이터 배경이에요." },
+  { id:"deco_energetic_001",   formKey:"energetic",    category:"decoration", name:"장난감 바구니",    price:20, asset:"/images/shop/decorations/deco_energetic_001",   description:"장난감이 가득한 바구니 장식이에요." },
+  { id:"bg_intelligent_001",   formKey:"intelligent",  category:"background", name:"별빛 서재",        price:40, asset:"/images/shop/backgrounds/bg_intelligent_001",    description:"똑똑형 전용 별빛 서재 배경이에요." },
+  { id:"deco_intelligent_001", formKey:"intelligent",  category:"decoration", name:"책 탑",            price:20, asset:"/images/shop/decorations/deco_intelligent_001",  description:"높이 쌓인 책 탑 장식이에요." },
+  { id:"bg_affectionate_001",  formKey:"affectionate", category:"background", name:"포근한 침대방",    price:40, asset:"/images/shop/backgrounds/bg_affectionate_001",   description:"포근형 전용 아늑한 방 배경이에요." },
+  { id:"deco_affectionate_001",formKey:"affectionate", category:"decoration", name:"하트 쿠션",        price:20, asset:"/images/shop/decorations/deco_affectionate_001", description:"포근한 하트 쿠션 장식이에요." },
+  { id:"bg_lucky_001",         formKey:"lucky",        category:"background", name:"마법의 별숲",      price:40, asset:"/images/shop/backgrounds/bg_lucky_001",          description:"신비형 전용 마법의 별숲 배경이에요." },
+  { id:"deco_lucky_001",       formKey:"lucky",        category:"decoration", name:"행운의 별",        price:20, asset:"/images/shop/decorations/deco_lucky_001",        description:"빛나는 행운의 별 장식이에요." },
+  { id:"bg_fashionable_001",   formKey:"fashionable",  category:"background", name:"패션 스튜디오",    price:40, asset:"/images/shop/backgrounds/bg_fashionable_001",    description:"패션형 전용 스튜디오 배경이에요." },
+  { id:"deco_fashionable_001", formKey:"fashionable",  category:"decoration", name:"드레스 행거",      price:20, asset:"/images/shop/decorations/deco_fashionable_001",  description:"예쁜 옷이 걸린 행거 장식이에요." },
+  { id:"bg_gluttonous_001",    formKey:"gluttonous",   category:"background", name:"달콤한 과자 나라", price:40, asset:"/images/shop/backgrounds/bg_gluttonous_001",     description:"먹보형 전용 달콤한 과자 나라 배경이에요." },
+  { id:"deco_gluttonous_001",  formKey:"gluttonous",   category:"decoration", name:"간식 바구니",      price:20, asset:"/images/shop/decorations/deco_gluttonous_001",   description:"간식이 가득한 바구니 장식이에요." },
+];
+
 const SHOP_MASTER = [
   // ── background ──────────────────────────────────────────
   {
@@ -273,6 +291,9 @@ const SHOP_MASTER = [
 
   // ── gift_item ── 뽑기 선물(GIFT_MASTER)을 파생 주입. 구매 즉시 inv.gifts에 인스턴스 추가(handleShopBuy).
   ...GIFT_SHOP_ITEMS,
+
+  // ── form_exclusive ── 진화형 이벤트 확인 후 노출되는 전용 아이템. Shop에서 formKey로 필터링.
+  ...FORM_SHOP_ITEMS,
 ];
 
 // 이미지가 없을 때 카테고리별 이모지 fallback
@@ -330,7 +351,7 @@ const EVENT_REWARDS    = {
 const INITIAL_STATUS   = { hunger: 80, mood: 80, cleanness: 80 };
 const INITIAL_TICKETS  = 3;
 
-const MINIGAME_CONFIG  = { numMin: 2, numRange: 8, wrongCount: 3, wrongRange: 10, wrongOffset: 5 };
+const MINIGAME_CONFIG  = { numMin: 2, numRange: 8, wrongCount: 3, wrongRange: 10, wrongOffset: 5, timerIcon: "/images/minigame/timer", timerIconSize: 44 };
 
 // ===================================================
 // 유틸
@@ -357,9 +378,11 @@ function determineFinalForm(traits, giftHistory) {
   const maxVal = Math.max(...Object.values(traits));
   const tops = Object.keys(traits).filter(k => traits[k] === maxVal);
   if (tops.length === 1) return tops[0];
-  // 1차: 후보들 중 각자의 부 성향 값이 가장 높은 쪽
-  const secMax = Math.max(...tops.map(k => traits[FINAL_FORMS[k].secondary]));
-  const secWinners = tops.filter(k => traits[FINAL_FORMS[k].secondary] === secMax);
+  // 1차: 후보들 중 각자의 부 성향 값이 가장 높은 쪽.
+  // 부 성향 키 자체가 동점 후보(tops)에 속하면 자기 자신을 참조하는 셈이므로 0으로 처리.
+  const secScore = k => { const sec = FINAL_FORMS[k].secondary; return tops.includes(sec) ? 0 : traits[sec]; };
+  const secMax = Math.max(...tops.map(secScore));
+  const secWinners = tops.filter(k => secScore(k) === secMax);
   if (secWinners.length === 1) return secWinners[0];
   // 2차: 선물 이력에서 마지막으로 준 성향 → 그래도 없으면 랜덤
   const lastTrait = [...giftHistory].reverse().find(g => secWinners.includes(g.trait))?.trait;
@@ -390,6 +413,7 @@ const DEFAULT_INV = {
   gifts:[], tickets:INITIAL_TICKETS, currency:0, unlockedPets:[],
   shopItems: { bg_default: { owned:true, equipped:true } },
   placedDecos: [],  // 방에 배치된 데코/창문 인스턴스 [{ iid, itemId, position:{x,y}, isFixed }]
+  formEvents: {},   // { [formKey]: { shopEventDone: true } } — 형태별 1회성 이벤트 완료 여부
 };
 
 const loadState = () => { try { const r=localStorage.getItem("tama_v2"); return r?JSON.parse(r):null; } catch{return null;} };
@@ -411,6 +435,7 @@ const normalizeInv = (raw) => {
     }
   });
   inv.shopItems = shop;
+  if (!inv.formEvents || typeof inv.formEvents !== "object") inv.formEvents = {};
   return inv;
 };
 const saveState = s => { try { localStorage.setItem("tama_v2",JSON.stringify(s)); } catch{} };
@@ -470,6 +495,7 @@ export default function App() {
   const [selGift,setSelGift]= useState(null);
   const [lastDraw,setLastDraw]= useState(null);
   const [devMode,    setDevMode]    = useState(false);
+  const [shopBubbleLocked, setShopBubbleLocked] = useState(false);
   const [devWeather, setDevWeather] = useState(null); // null = 실제 날씨 사용
   const newPetRef = useRef(false);  // "다른 펫 키우기" 진입 시 handleEggSelect가 inv·daily를 보존하도록 표시
   const [feedTick, setFeedTick] = useState(0);  // 밥 줄 때마다 증가 → 펫이 밥 먹는 연출 트리거
@@ -545,12 +571,14 @@ export default function App() {
   const handlePlay = () => {
     const a=Math.floor(Math.random()*MINIGAME_CONFIG.numRange)+MINIGAME_CONFIG.numMin, b=Math.floor(Math.random()*MINIGAME_CONFIG.numRange)+MINIGAME_CONFIG.numMin, ans=a*b;
     const wrongs=[]; while(wrongs.length<MINIGAME_CONFIG.wrongCount){ const w=ans+(Math.floor(Math.random()*MINIGAME_CONFIG.wrongRange)-MINIGAME_CONFIG.wrongOffset); if(w!==ans&&w>0&&!wrongs.includes(w)) wrongs.push(w); }
-    setGame({ a, b, answer:ans, choices:[ans,...wrongs].sort(()=>Math.random()-.5), done:false });
+    setGame({ a, b, answer:ans, choices:[ans,...wrongs].sort(()=>Math.random()-.5), done:false, startTime:Date.now() });
     setScreen("minigame");
   };
   const handleGameAnswer = choice => {
     if(choice===game.answer){
-      setGame(g=>({...g,done:true,correct:true}));
+      const elapsed = (Date.now() - game.startTime) / 1000;
+      const isPerfect = elapsed <= 3;
+      setGame(g=>({...g,done:true,correct:true,elapsed,isPerfect}));
       setTimeout(()=>{ const first = !devMode && !daily.missions.play; if(first) markMissionDone("play"); setPet(p=>({...p,status:{...p.status,mood:Math.min(100,p.status.mood+MISSION_REWARDS.play.statusGain)}})); showToast(devMode?"🔧 [DEV] 정답!":first?"🎮 정답! 미션에서 보상을 받으세요.":"🎮 정답! 잘했어요!"); setScreen("home"); setGame(null); },900);
     } else {
       setGame(g=>({...g,done:true,correct:false}));
@@ -743,6 +771,23 @@ export default function App() {
     setPopup(null); setScreen("egg_select");
     saveState({ egg:null, pet:DEFAULT_PET, daily, inv, ghist:[] });
   };
+  const handleFormShopEvent = () => {
+    const form = pet.finalForm ? FINAL_FORMS[pet.finalForm] : null;
+    if (!form) return;
+    const newShopItems = { ...inv.shopItems };
+    (form.shopUnlocks || []).forEach(id => {
+      if (!newShopItems[id]) newShopItems[id] = { owned: true, equipped: false };
+    });
+    setInv(i => ({
+      ...i,
+      currency: i.currency + 10,
+      shopItems: newShopItems,
+      formEvents: { ...i.formEvents, [pet.finalForm]: { shopEventDone: true } },
+    }));
+    setPopup(null);
+    setScreen("shop");
+  };
+
   const handleShare = () => {
     const text = `내 펫 ${getPetName()}을(를) 키우고 있어요! 🥚 함께 키워볼까요?`;
     if(navigator.share) navigator.share({ title:"내 펫 자랑", text, url: window.location.href }).catch(()=>{});
@@ -797,6 +842,8 @@ export default function App() {
             onGiftNav={()=>setScreen("giftbox")} onStatusCheck={handleStatusCheck}
             onNav={setScreen} onShare={handleShare} onSettings={()=>setPopup("settings")} onEventClaim={handleEventReward}
             onDecorSave={handleDecorSave}
+            onFormShopEvent={()=>{ setShopBubbleLocked(false); setPopup("formShopEvent"); }}
+            onShopBubbleLock={()=>setShopBubbleLocked(true)}
           />
         )}
 
@@ -817,6 +864,8 @@ export default function App() {
         {popup==="rainbow"   && <RainbowPopup onChoose={handleRainbow} onClose={()=>setPopup(null)}/>}
         {popup==="evolution" && evoData && <EvoPopup data={evoData} egg={egg} onConfirm={handleEvoConfirm}/>}
         {popup==="settings"  && <SettingsPopup onClose={()=>setPopup(null)} onExport={handleExport} onImport={handleImport}/>}
+        {popup==="formShopEvent" && pet.finalForm && <FormShopEventPopup form={FINAL_FORMS[pet.finalForm]} onConfirm={handleFormShopEvent} onClose={()=>setPopup(null)}/>}
+        {shopBubbleLocked && <div style={{position:"absolute",inset:0,zIndex:8000}}/>}
         {popup==="devpanel" && import.meta.env.DEV && (
           <DevPanel
             pet={pet} daily={daily} devMode={devMode} devWeather={devWeather}
@@ -971,7 +1020,7 @@ function petMotionOf(egg, pet) {
 function petColorOf(pet) { return pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm].color : "#88d8b0"; }
 
 // 모션 에셋 유무를 확인해 wandering / 정적 fallback 결정
-function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji, petName, petColor, feedSignal, homeBiasX = 0 }) {
+function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji, petName, petColor, feedSignal, homeBiasX = 0, showShopBubble, onShopBubble, onShopBubbleLock }) {
   const [ready, setReady] = useState(null); // null=확인중, true=모션, false=정적fallback
   useEffect(() => {
     if (!motion?.stand || !motion?.walk) { setReady(false); return; }
@@ -995,13 +1044,24 @@ function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji
       </div>
     );
   }
-  return <WanderingPetActive containerRef={containerRef} scrollXRef={scrollXRef} motion={motion} petName={petName} petColor={petColor} feedSignal={feedSignal} homeBiasX={homeBiasX}/>;
+  return <WanderingPetActive containerRef={containerRef} scrollXRef={scrollXRef} motion={motion} petName={petName} petColor={petColor} feedSignal={feedSignal} homeBiasX={homeBiasX} showShopBubble={showShopBubble} onShopBubble={onShopBubble} onShopBubbleLock={onShopBubbleLock}/>;
 }
 
-function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColor, feedSignal, homeBiasX = 0 }) {
+function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColor, feedSignal, homeBiasX = 0, showShopBubble, onShopBubble, onShopBubbleLock }) {
   const wrapRef = useRef(null), imgRef = useRef(null), bubbleRef = useRef(null), bubbleTextRef = useRef(null), foodRef = useRef(null);
   const feedSignalRef = useRef(feedSignal);
   useEffect(() => { feedSignalRef.current = feedSignal; }, [feedSignal]);  // 밥 신호를 루프가 ref로 읽음(루프 재시작 방지)
+  const homeInitRef = useRef(false);  // true=진화 등 재실행, false=첫 마운트
+  const showShopBubbleRef = useRef(showShopBubble);
+  const onShopBubbleRef = useRef(onShopBubble);
+  const onShopBubbleLockRef = useRef(onShopBubbleLock);
+  const bubbleLockedRef = useRef(false);
+  useEffect(() => {
+    showShopBubbleRef.current = showShopBubble;
+    if (!showShopBubble) bubbleLockedRef.current = false; // 확인 완료 후 리셋
+  }, [showShopBubble]);
+  useEffect(() => { onShopBubbleRef.current = onShopBubble; }, [onShopBubble]);
+  useEffect(() => { onShopBubbleLockRef.current = onShopBubbleLock; }, [onShopBubbleLock]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -1095,6 +1155,10 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
         case "walk": if (target) moveToward(); else pet.state = "idle"; break;
         default: if (t >= idleUntil) pickTarget();
       }
+      // 상점 이벤트 말풍선 — 말풍선이 꺼지면 다시 표시
+      if (showShopBubbleRef.current && !bubbleLockedRef.current && pet.state !== "grabbed" && pet.state !== "oneshot" && t >= bubbleUntil) {
+        showBubble("저기 혹시 바빠?", 2500);
+      }
       render();
       rafId = requestAnimationFrame(tick);
     }
@@ -1102,10 +1166,19 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
     // ── 입력: 탭=대사/감정, 길게 끌기=잡아서 옮기기(월드 좌표). 펫 위 조작은 배경 스크롤로 안 샘 ──
     let down = null, lastTap = 0, tapCount = 0;
     function handleTap() {
-      if (pet.state === "oneshot") return;  // 감정 재생 중엔 탭 무시(다른 말풍선 안 뜨게)
+      if (pet.state === "oneshot") return;
       const t = now();
       tapCount = (t - lastTap < C.tapWindow) ? tapCount + 1 : 1; lastTap = t;
       if (tapCount >= C.tapsForEmotion) { tapCount = 0; triggerEmotion(); }
+      else if (showShopBubbleRef.current) {
+        bubbleLockedRef.current = true;
+        onShopBubbleLockRef.current?.();
+        const replies = ["보여줄게 있어!", "있잖아, 그게…", "오~ 들어봐!"];
+        showBubble(replies[Math.floor(Math.random() * replies.length)], 2000);
+        if (pet.state === "walk") { target = null; pet.state = "idle"; }
+        idleUntil = t + 700;
+        setTimeout(() => { if (onShopBubbleRef.current) onShopBubbleRef.current(); }, 2100);
+      }
       else {
         showBubble(PET_LINES[Math.floor(Math.random() * PET_LINES.length)]);
         if (pet.state === "walk") { target = null; pet.state = "idle"; }
@@ -1135,7 +1208,9 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
     window.addEventListener("resize", resize);
 
     resize();
-    home = clampFloor((scrollXRef?.current || 0) + W / 2 + homeBiasX, H * 0.78);  // 초기 활동 중심 = 현재 보이는 방 중앙(월드) + 오프셋
+    const initSX = homeInitRef.current ? (scrollXRef?.current || 0) : W;  // 첫 마운트=룸 중앙(W), 재실행(진화)=실제 scrollX
+    homeInitRef.current = true;
+    home = clampFloor(initSX + W / 2 + homeBiasX, H * 0.78);
     pet.x = home.x; pet.y = home.y;
     idleUntil = now() + 500;
     rafId = requestAnimationFrame(tick);
@@ -1344,7 +1419,7 @@ function HomeLayout({
   pet, daily, inv, weather, wm, growthPct, growthMax, missionDone,
   getPetEmoji, getPetName, getPetImg, getPetMotion, canEvolve, feedSignal,
   onFeed, onPlay, onClean, onGiftNav, onStatusCheck, onNav, onShare, onSettings, onEventClaim,
-  onDecorSave,
+  onDecorSave, onFormShopEvent, onShopBubbleLock,
 }) {
   const hasEvent = daily.event && !daily.eventRewardClaimed;
   const petColor = pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm].color : "#88d8b0";
@@ -1395,7 +1470,14 @@ function HomeLayout({
   };
   const handleDraftRemove = (iid) => {
     setDraftDecos(prev => { const n={...prev}; delete n[iid]; return n; });
-    setSelectedDecoIid(s => s === iid ? null : s);   // 삭제한 게 선택돼 있었으면 해제
+  };
+  const handleDraftRemoveAll = (itemId) => {
+    setDraftDecos(prev => {
+      const n = {...prev};
+      Object.keys(n).forEach(iid => { if (n[iid].itemId === itemId) delete n[iid]; });
+      return n;
+    });
+    setSelectedDecoIid(null);
   };
   const handleDraftMove = (iid, pos) => {
     setDraftDecos(prev => ({ ...prev, [iid]: { ...prev[iid], position: pos } }));
@@ -1537,6 +1619,9 @@ function HomeLayout({
             petName={getPetName()}
             petColor={petColor}
             feedSignal={feedSignal}
+            showShopBubble={pet.stage===3 && !!pet.finalForm && !inv.formEvents?.[pet.finalForm]?.shopEventDone}
+            onShopBubble={onFormShopEvent}
+            onShopBubbleLock={onShopBubbleLock}
           />
         )}
 
@@ -1567,6 +1652,7 @@ function HomeLayout({
             onToggle={() => { setIsDecorPanelOpen(o=>!o); setIsDraggingDecor(false); }}
             onBgSelect={(id) => setDraftBg(id)}
             onDecoAdd={(id) => handleDraftAdd(id)}
+            onDecoRemoveAll={(id) => handleDraftRemoveAll(id)}
           />
         )}
       </div>
@@ -2091,7 +2177,34 @@ function CleaningOverlay({ petImg, petFallback, onComplete, onExit }) {
 // ===================================================
 // 미니게임
 // ===================================================
+const TIMER_IMG_EXTS = ["webp", "png", "jpg"];
+
+function TimerIcon({ src, fallback, size = 24 }) {
+  const [extIdx, setExtIdx] = useState(0);
+  useEffect(() => { setExtIdx(0); }, [src]);
+  if (src && !src.includes("/") && src.length === 2) {
+    return <div style={{fontSize:size}}>{src}</div>;
+  }
+  if (src && extIdx < TIMER_IMG_EXTS.length) {
+    return <img src={`${src}.${TIMER_IMG_EXTS[extIdx]}`} alt="timer" draggable={false}
+      onError={()=>setExtIdx(i=>i+1)} style={{width:size,height:size,display:"block"}}/>;
+  }
+  return <div style={{fontSize:size}}>{fallback}</div>;
+}
+
 function MiniGame({ game, onAnswer, onBack }) {
+  const [elapsed, setElapsed] = useState(0);
+  const TIME_LIMIT = 10;
+  useEffect(() => {
+    if (game.done) return;
+    const id = setInterval(() => {
+      const e = (Date.now() - game.startTime) / 1000;
+      setElapsed(Math.min(e, TIME_LIMIT + 1));
+    }, 50);
+    return () => clearInterval(id);
+  }, [game.done, game.startTime]);
+
+  const progress = Math.max(0, (TIME_LIMIT - elapsed) / TIME_LIMIT);
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,gap:24,animation:"fadeUp .3s ease"}}>
       <button onClick={onBack} style={{alignSelf:"flex-start",background:PANEL_BTN,border:"none",borderRadius:20,padding:"8px 16px",color:INK,fontWeight:700,cursor:"pointer"}}>← 뒤로</button>
@@ -2104,8 +2217,36 @@ function MiniGame({ game, onAnswer, onBack }) {
         <p style={{color:INK_SUB,fontSize:13,marginBottom:8}}>다음을 계산하세요</p>
         <p style={{fontFamily:"'Jua',sans-serif",fontSize:44,color:INK}}>{game.a} × {game.b} = ?</p>
       </div>
+      {!game.done && (
+        <div style={{width:"100%",maxWidth:280,position:"relative"}}>
+          <div style={{background:"rgba(0,0,0,.15)",borderRadius:12,height:14,overflow:"visible",border:`1px solid rgba(255,255,255,.2)`,position:"relative"}}>
+            <div style={{width:`${progress*100}%`,height:"100%",background:"linear-gradient(90deg,#66BB6A,#4CAF50)",transition:"width .05s linear",borderRadius:12}}/>
+            <div style={{position:"absolute",left:"70%",top:0,bottom:0,width:1.5,background:"#FFD700",zIndex:2}}/>
+            <div style={{position:"absolute",left:-8,top:"50%",transform:"translateY(-50%)",zIndex:3}}>
+              <TimerIcon src={MINIGAME_CONFIG.timerIcon} fallback="⏱️" size={MINIGAME_CONFIG.timerIconSize}/>
+            </div>
+          </div>
+        </div>
+      )}
       {game.done
-        ? <div style={{fontSize:64,animation:"pop .4s ease"}}>{game.correct?"🎉":"😢"}</div>
+        ? <div style={{textAlign:"center",animation:"pop .4s ease",width:"100%"}}>
+            <div style={{fontSize:64}}>{game.correct?"🎉":"😢"}</div>
+            {game.correct && (() => {
+              const text = game.isPerfect ? "Perfect!" : "Good!";
+              const fg = game.isPerfect
+                ? "linear-gradient(180deg,#FFE566 0%,#FF9900 100%)"
+                : "linear-gradient(180deg,#6EE56E 0%,#2E9E2E 100%)";
+              const stroke = game.isPerfect ? "#C05000" : "#0A5A0A";
+              const fs = game.isPerfect ? 40 : 34;
+              const common = {fontFamily:"'Jua',sans-serif",fontSize:fs,fontWeight:900,letterSpacing:2,margin:0,position:"absolute",top:0,left:0,right:0,textAlign:"center"};
+              return (
+                <div style={{position:"relative",height:fs*1.4,marginTop:8,width:"100%"}}>
+                  <p style={{...common,WebkitTextStroke:`8px ${stroke}`,color:stroke}}>{text}</p>
+                  <p style={{...common,background:fg,WebkitBackgroundClip:"text",backgroundClip:"text",WebkitTextFillColor:"transparent"}}>{text}</p>
+                </div>
+              );
+            })()}
+          </div>
         : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,width:"100%"}}>
             {game.choices.map((c,i)=>(
               <button key={i} onClick={()=>onAnswer(c)} style={{background:CARD_BG,border:`2px solid ${CARD_BORDER}`,borderRadius:18,padding:"18px",fontSize:26,fontWeight:900,color:INK,cursor:"pointer",fontFamily:"'Jua',sans-serif"}}>
@@ -2154,6 +2295,10 @@ function MissionScreen({ daily, onClaim, onBack }) {
       <div style={{textAlign:"center",fontSize:11,color:INK_FAINT,marginBottom:6}}>🕛 매일 자정(00:00) 초기화</div>
 
       {/* 진행도 바 */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+        <span style={{fontSize:11,fontWeight:700,color:INK_SUB}}>달성률</span>
+        <span style={{fontSize:11,fontWeight:800,color:"#C8881A"}}>{Math.round((done/5)*100)}%</span>
+      </div>
       <div style={{background:"rgba(0,0,0,.15)",borderRadius:10,height:8,overflow:"hidden",marginBottom:14}}>
         <div style={{width:`${(done/5)*100}%`,height:"100%",background:"linear-gradient(90deg,#F7971E,#FFD200)",borderRadius:10,transition:"width .5s"}}/>
       </div>
@@ -2337,8 +2482,11 @@ function GiftBox({ inv, daily, sel, onSel, onGive, onSell, onBack }) {
     acc[g.id].count++;
     return acc;
   }, {}));
-  const gc = { normal:CARD_BG, rare:"rgba(79,195,247,.25)", superrare:"rgba(255,193,7,.28)" };
-  const gb = { normal:CARD_BORDER, rare:"#4FC3F7", superrare:"#E0A91E" };
+  const gradeStyle = {
+    normal:    { label:"일반",   color:"rgba(90,62,27,.5)",  bg:"rgba(120,90,50,.1)" },
+    rare:      { label:"희귀",   color:"#4FC3F7",            bg:"rgba(79,195,247,.15)" },
+    superrare: { label:"초레어", color:"#E0A91E",            bg:"rgba(255,193,7,.18)" },
+  };
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",padding:18,animation:"fadeUp .3s ease"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
@@ -2351,17 +2499,23 @@ function GiftBox({ inv, daily, sel, onSel, onGive, onSell, onBack }) {
             <span style={{fontSize:48}}>📭</span><p style={{fontSize:13}}>선물이 없어요. 뽑기를 해보세요!</p>
           </div>
         : <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,flex:1,overflowY:"auto",alignContent:"start",paddingBottom:8}}>
-            {groups.map(g=>(
-              <button key={g.id} onClick={()=>onSel(g.first)}
-                style={{background:gc[g.grade],border:`2px solid ${gb[g.grade]}`,borderRadius:18,padding:"16px 8px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
-                <div style={{fontSize:40,lineHeight:1}}>{g.emoji}</div>
-                <div style={{fontSize:12,fontWeight:800,color:INK}}>{g.name}</div>
-                <div style={{fontSize:11,color:TRAITS[g.trait].color,whiteSpace:"nowrap"}}>
-                  {TRAITS[g.trait].emoji} +{g.traitValue}
-                  {g.count>1 && <span style={{color:INK_SUB}}> · {g.count}개 보유</span>}
-                </div>
-              </button>
-            ))}
+            {groups.map(g=>{
+              const gs = gradeStyle[g.grade];
+              return (
+                <button key={g.id} onClick={()=>onSel(g.first)}
+                  style={{background:CARD_BG,border:`1.5px solid ${CARD_BORDER}`,borderRadius:18,padding:"16px 8px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
+                  <div style={{fontSize:40,lineHeight:1}}>{g.emoji}</div>
+                  <div style={{fontSize:12,fontWeight:800,color:INK}}>{g.name}</div>
+                  <div style={{fontSize:11,color:TRAITS[g.trait].color,whiteSpace:"nowrap"}}>
+                    {TRAITS[g.trait].emoji} +{g.traitValue}
+                    {g.count>1 && <span style={{color:INK_SUB}}> · {g.count}개 보유</span>}
+                  </div>
+                  <div style={{fontSize:10,fontWeight:800,color:gs.color,background:gs.bg,borderRadius:8,padding:"2px 8px",marginTop:2}}>
+                    {gs.label}
+                  </div>
+                </button>
+              );
+            })}
           </div>
       }
       {/* 상세 팝업 — sel(selGift) 구동. 주면 handleGiftGive가 setSelGift(null) → 자동 닫힘 */}
@@ -2375,7 +2529,34 @@ function GiftBox({ inv, daily, sel, onSel, onGive, onSell, onBack }) {
 // ===================================================
 // 도감
 // ===================================================
+function CollectionDetailPopup({ formKey, form, onClose }) {
+  const trait = TRAITS[formKey];
+  return (
+    <Overlay>
+      <div style={{background:"rgba(16,14,36,.96)",backdropFilter:"blur(20px)",borderRadius:28,padding:"28px 24px",width:"90%",maxWidth:340,border:`1.5px solid ${form.color}44`,animation:"slideUp .35s ease",textAlign:"center",position:"relative"}}>
+        <button onClick={onClose} style={{position:"absolute",top:14,right:16,background:"rgba(255,255,255,.12)",border:"none",borderRadius:14,padding:"5px 11px",color:"#fff",cursor:"pointer",fontWeight:700,fontSize:14}}>✕</button>
+        <div style={{fontSize:60,marginBottom:10}}>{form.emoji}</div>
+        <h3 style={{fontFamily:"'Jua',sans-serif",fontSize:20,color:"#fff",marginBottom:14}}>{form.name}</h3>
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
+          <div style={{background:`${form.color}22`,border:`1.5px solid ${form.color}55`,borderRadius:14,padding:"10px 16px",textAlign:"center"}}>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginBottom:4}}>주 성향</div>
+            <div style={{fontSize:15,fontWeight:800,color:form.color}}>{trait.label} {trait.emoji}</div>
+          </div>
+          <div style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",borderRadius:14,padding:"10px 16px",textAlign:"center"}}>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginBottom:4}}>고유 스킬</div>
+            <div style={{fontSize:15,fontWeight:800,color:"#fff"}}>{form.skill} {form.skillEmoji}</div>
+          </div>
+        </div>
+        <button onClick={onClose} style={{width:"100%",background:`linear-gradient(135deg,${form.color},${form.color}99)`,border:"none",borderRadius:14,padding:"12px",fontSize:15,fontWeight:800,color:"#fff",cursor:"pointer",fontFamily:"'Jua',sans-serif"}}>
+          확인
+        </button>
+      </div>
+    </Overlay>
+  );
+}
+
 function Collection({ inv, onBack }) {
+  const [selectedKey, setSelectedKey] = useState(null);
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",padding:18,animation:"fadeUp .3s ease"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
@@ -2387,7 +2568,8 @@ function Collection({ inv, onBack }) {
         {Object.entries(FINAL_FORMS).map(([key,form])=>{
           const unlocked = inv.unlockedPets.includes(key);
           return (
-            <div key={key} style={{background:unlocked?`${form.color}30`:CARD_BG_DIM,border:`1.5px solid ${unlocked?form.color+"66":CARD_BORDER}`,borderRadius:18,padding:"16px 6px",textAlign:"center",backdropFilter:"blur(8px)"}}>
+            <div key={key} onClick={()=>unlocked&&setSelectedKey(key)}
+              style={{background:unlocked?CARD_BG:CARD_BG_DIM,border:`1.5px solid ${CARD_BORDER}`,borderRadius:18,padding:"16px 6px",textAlign:"center",backdropFilter:"blur(8px)",cursor:unlocked?"pointer":"default"}}>
               <div style={{fontSize:40,marginBottom:5,filter:unlocked?"none":"grayscale(1) brightness(.3)"}}>{form.emoji}</div>
               <div style={{fontSize:11,fontWeight:700,color:unlocked?INK:INK_FAINT}}>{unlocked?form.name:"???"}</div>
               {unlocked&&<div style={{fontSize:10,color:TRAITS[key].color,marginTop:3}}>{TRAITS[key].emoji} {TRAITS[key].label}</div>}
@@ -2395,6 +2577,13 @@ function Collection({ inv, onBack }) {
           );
         })}
       </div>
+      {selectedKey && (
+        <CollectionDetailPopup
+          formKey={selectedKey}
+          form={FINAL_FORMS[selectedKey]}
+          onClose={()=>setSelectedKey(null)}
+        />
+      )}
     </div>
   );
 }
@@ -2403,15 +2592,19 @@ function Collection({ inv, onBack }) {
 // 상점
 // ===================================================
 // 상품 이미지 — 로드 실패 시 카테고리별 이모지 fallback
+const SHOP_IMG_EXTS = ["webp", "png", "jpg"];
 function ShopItemImage({ item, size=64 }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => { setFailed(false); }, [item.imagePath]);
-  const fallback = item.emoji || CATEGORY_FALLBACK[item.category] || "🛍️";  // 선물은 자기 이모지
-  if (item.imagePath && !failed) {
-    return (
-      <img src={item.imagePath} alt="" onError={() => setFailed(true)}
-        style={{width:size,height:size,maxWidth:size,maxHeight:size,objectFit:"contain",display:"block"}}/>
-    );
+  const [extIdx, setExtIdx] = useState(0);
+  const [legacyFailed, setLegacyFailed] = useState(false);
+  useEffect(() => { setExtIdx(0); setLegacyFailed(false); }, [item.id]);
+  const fallback = item.emoji || CATEGORY_FALLBACK[item.category] || "🛍️";
+  if (item.asset) {
+    if (extIdx < SHOP_IMG_EXTS.length)
+      return <img src={`${item.asset}.${SHOP_IMG_EXTS[extIdx]}`} alt="" onError={()=>setExtIdx(i=>i+1)}
+        style={{width:size,height:size,maxWidth:size,maxHeight:size,objectFit:"contain",display:"block"}}/>;
+  } else if (item.imagePath && !legacyFailed) {
+    return <img src={item.imagePath} alt="" onError={()=>setLegacyFailed(true)}
+      style={{width:size,height:size,maxWidth:size,maxHeight:size,objectFit:"contain",display:"block"}}/>;
   }
   return <span style={{fontSize:Math.round(size*0.62),lineHeight:1}}>{fallback}</span>;
 }
@@ -2419,7 +2612,8 @@ function ShopItemImage({ item, size=64 }) {
 // ===================================================
 // 꾸미기 모드 하단 패널 (홈에서만 사용)
 // ===================================================
-function DecorateModePanel({ inv, draftBg, draftDecos, isOpen, onToggle, onBgSelect, onDecoAdd }) {
+function DecorateModePanel({ inv, draftBg, draftDecos, isOpen, onToggle, onBgSelect, onDecoAdd, onDecoRemoveAll }) {
+  const [confirmItem, setConfirmItem] = useState(null);  // 전부 치우기 확인 팝업 대상 아이템
   const ownedBgs   = SHOP_MASTER.filter(i => i.category === "background" && (inv.shopItems?.[i.id]?.owned || i.isDefault));
   const ownedDecos = SHOP_MASTER.filter(i => DECOR_CATEGORIES.includes(i.category) && (inv.shopItems?.[i.id]?.count || 0) > 0);
   // 종류별 현재 배치된(draft) 인스턴스 수 — 잔여 개수 표시용
@@ -2457,7 +2651,7 @@ function DecorateModePanel({ inv, draftBg, draftDecos, isOpen, onToggle, onBgSel
     const remain = owned - placed;
     const disabled = remain <= 0;
     return (
-      <div onClick={disabled ? undefined : () => onDecoAdd(item.id)}
+      <div onClick={disabled ? () => setConfirmItem(item) : () => onDecoAdd(item.id)}
         style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,
           padding:"8px 6px",borderRadius:14,cursor:disabled?"default":"pointer",minWidth:68,
           opacity:disabled?0.45:1,
@@ -2481,6 +2675,28 @@ function DecorateModePanel({ inv, draftBg, draftDecos, isOpen, onToggle, onBgSel
 
   return (
     <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:Z_UI.decorCtrl}}>
+
+      {/* 전부 치우기 확인 팝업 */}
+      {confirmItem && (
+        <div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,.55)"}}>
+          <div style={{background:"#1e1438",border:"1.5px solid rgba(255,255,255,.2)",borderRadius:20,padding:"24px 20px",width:"80%",maxWidth:300,textAlign:"center"}}>
+            <div style={{fontSize:32,marginBottom:10}}>🗑️</div>
+            <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:6}}>{confirmItem.name}</div>
+            <div style={{fontSize:13,color:"rgba(255,255,255,.65)",marginBottom:20}}>방에 놓은 걸 전부 치울까요?</div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={() => setConfirmItem(null)}
+                style={{flex:1,padding:"10px 0",borderRadius:12,border:"1.5px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.08)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                아니요
+              </button>
+              <button onClick={() => { onDecoRemoveAll(confirmItem.id); setConfirmItem(null); }}
+                style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",background:"#e05555",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>
+                치울게요
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 토글 핸들 */}
       <div onClick={onToggle}
         style={{display:"flex",justifyContent:"center",alignItems:"center",
@@ -2635,8 +2851,10 @@ function Shop({ inv, onBuy, onBack }) {
     };
   }, [sortOpen]);
 
+  const isUnlocked = (item) => !item.formKey || inv.formEvents?.[item.formKey]?.shopEventDone;
+
   const sorted = SHOP_MASTER
-    .filter(i => tab === "decoration" ? DECOR_CATEGORIES.includes(i.category) : i.category === tab)
+    .filter(i => (tab === "decoration" ? DECOR_CATEGORIES.includes(i.category) : i.category === tab) && isUnlocked(i))
     .slice()
     .sort((a, b) =>
       sort === "price"
@@ -3145,7 +3363,8 @@ function ARSocialScreen({ egg, pet, onBack }) {
     if (img && img.complete && img.naturalWidth) {
       const t=tfRef.current, ar=img.naturalWidth/img.naturalHeight, w=AR_PET_BASE, h=AR_PET_BASE/ar;
       ctx.save(); ctx.translate(t.x+gyro.dx, t.y+gyro.dy); ctx.rotate(t.r*Math.PI/180); ctx.scale(t.s,t.s);
-      ctx.drawImage(img,-w/2,-h/2,w,h); ctx.restore();
+      ctx.filter="drop-shadow(0 8px 18px rgba(0,0,0,.4))";
+      ctx.drawImage(img,-w/2,-h/2,w,h); ctx.filter="none"; ctx.restore();
     }
     cv.toBlob(async (blob) => {
       if (!blob) return;
@@ -3691,6 +3910,31 @@ function DevPanel({ pet, daily, devMode, devWeather, onToggleDevMode, onClose, o
 }
 
 // ===================================================
+// 팝업: 3단계 펫 상점 이벤트 (1회성)
+// ===================================================
+function FormShopEventPopup({ form, onConfirm, onClose }) {
+  return (
+    <Overlay>
+      <div style={{background:"rgba(16,14,36,.96)",backdropFilter:"blur(20px)",borderRadius:28,padding:"26px 22px",width:"90%",maxWidth:360,border:"1.5px solid rgba(255,255,255,.15)",animation:"slideUp .35s ease",textAlign:"center"}}>
+        <div style={{fontSize:48,marginBottom:10}}>🛍️</div>
+        <h3 style={{fontFamily:"'Jua',sans-serif",fontSize:19,color:"#fff",marginBottom:6}}>새로운 아이템 해금!</h3>
+        <p style={{color:"rgba(255,255,255,.7)",fontSize:13,lineHeight:1.7,marginBottom:18}}>
+          상점에 특별한 아이템이<br/>추가됐다고 해요!<br/>상점으로 가볼까요?
+        </p>
+        <div style={{background:`${form.color}22`,border:`1.5px solid ${form.color}66`,borderRadius:12,padding:"8px 16px",display:"inline-block",fontSize:13,fontWeight:800,color:form.color,marginBottom:20}}>
+          💰 재화 +10
+        </div>
+        <button
+          onClick={onConfirm}
+          style={{display:"block",width:"100%",background:`linear-gradient(135deg,${form.color},${form.color}99)`,border:"none",borderRadius:14,padding:"13px",fontSize:15,fontWeight:800,color:"#fff",cursor:"pointer",fontFamily:"'Jua',sans-serif"}}
+        >
+          확인
+        </button>
+      </div>
+    </Overlay>
+  );
+}
+
 // 팝업: 설정 (세이브 코드 내보내기/불러오기)
 // ===================================================
 function SettingsPopup({ onClose, onExport, onImport }) {
