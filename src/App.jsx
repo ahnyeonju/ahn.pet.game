@@ -547,25 +547,22 @@ export default function App() {
 
   // 백버튼 → 서브화면 닫기 or 종료 확인 오버레이
   useEffect(() => {
-    history.pushState({ tama: true }, '');
+    // '#' 해시 포함: 삼성 인터넷 등 Android 브라우저에서 popstate 확실히 발동
+    history.pushState({ tama: true }, '', '#');
     const handler = () => {
+      // 이탈 차단 최우선: 즉시 히스토리 복원 후 화면 전환 처리
+      history.pushState({ tama: true }, '', '#');
       const s = screenRef.current;
       const p = popupRef.current;
       const ex = exitConfirmRef.current;
       if (ex) {
-        // 종료 확인 중 → 취소
         setExitConfirm(false);
-        history.pushState({ tama: true }, '');
       } else if (p) {
         setPopup(null);
-        history.pushState({ tama: true }, '');
       } else if (s !== 'home' && s !== 'egg_select') {
         setScreen('home');
-        history.pushState({ tama: true }, '');
       } else {
-        // 홈/알 선택 → 커스텀 종료 확인 오버레이 표시
         setExitConfirm(true);
-        history.pushState({ tama: true }, '');
       }
     };
     window.addEventListener('popstate', handler);
