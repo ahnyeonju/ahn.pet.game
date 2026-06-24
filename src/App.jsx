@@ -247,18 +247,23 @@ const GIFT_SHOP_ITEMS = GIFT_MASTER.map(g => ({
 // 아이템 추가 시 이 배열에만 추가하면 Shop·구매·저장 모두 자동 반영.
 const FORM_SHOP_ITEMS = [
   { id:"bg_energetic_001",     formKey:"energetic",    category:"background", name:"활기찬 놀이터",    price:40, asset:"/images/shop/backgrounds/bg_energetic_001",     description:"장난꾸러기형 전용 활기찬 놀이터 배경이에요." },
-  { id:"deco_energetic_001",   formKey:"energetic",    category:"decoration", name:"장난감 바구니",    price:20, asset:"/images/shop/decorations/deco_energetic_001",   description:"장난감이 가득한 바구니 장식이에요." },
+  { id:"deco_energetic_001",   formKey:"energetic",    category:"decoration", name:"장난감 바구니",    price:20, asset:"/images/shop/decorations/deco_energetic_001",   description:"장난감이 가득한 바구니 장식이에요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_energetic_001_pet",   allowedForms:["energetic"],    hitRadiusPx:120, compositeWidthPx:600 } },
   { id:"bg_intelligent_001",   formKey:"intelligent",  category:"background", name:"별빛 서재",        price:40, asset:"/images/shop/backgrounds/bg_intelligent_001",    description:"똑똑형 전용 별빛 서재 배경이에요." },
-  { id:"deco_intelligent_001", formKey:"intelligent",  category:"decoration", name:"책 탑",            price:20, asset:"/images/shop/decorations/deco_intelligent_001",  description:"높이 쌓인 책 탑 장식이에요." },
+  { id:"deco_intelligent_001", formKey:"intelligent",  category:"decoration", name:"책 탑",            price:20, asset:"/images/shop/decorations/deco_intelligent_001",  description:"높이 쌓인 책 탑 장식이에요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_intelligent_001_pet", allowedForms:["intelligent"],  hitRadiusPx:120, compositeWidthPx:600 } },
   { id:"bg_affectionate_001",  formKey:"affectionate", category:"background", name:"포근한 침대방",    price:40, asset:"/images/shop/backgrounds/bg_affectionate_001",   description:"포근형 전용 아늑한 방 배경이에요." },
-  { id:"deco_affectionate_001",formKey:"affectionate", category:"decoration", name:"하트 쿠션",        price:20, asset:"/images/shop/decorations/deco_affectionate_001", description:"포근한 하트 쿠션 장식이에요." },
+  { id:"deco_affectionate_001",formKey:"affectionate", category:"decoration", name:"하트 쿠션",        price:20, asset:"/images/shop/decorations/deco_affectionate_001", description:"포근한 하트 쿠션 장식이에요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_affectionate_001_pet",allowedForms:["affectionate"], hitRadiusPx:120, compositeWidthPx:600 } },
   { id:"bg_lucky_001",         formKey:"lucky",        category:"background", name:"마법의 별숲",      price:40, asset:"/images/shop/backgrounds/bg_lucky_001",          description:"신비형 전용 마법의 별숲 배경이에요." },
-  { id:"deco_lucky_001",       formKey:"lucky",        category:"decoration", name:"행운의 별",        price:20, asset:"/images/shop/decorations/deco_lucky_001",        description:"빛나는 행운의 별 장식이에요." },
+  { id:"deco_lucky_001",       formKey:"lucky",        category:"decoration", name:"행운의 별",        price:20, asset:"/images/shop/decorations/deco_lucky_001",        description:"빛나는 행운의 별 장식이에요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_lucky_001_pet",       allowedForms:["lucky"],        hitRadiusPx:120, compositeWidthPx:600 } },
   { id:"bg_fashionable_001",   formKey:"fashionable",  category:"background", name:"패션 스튜디오",    price:40, asset:"/images/shop/backgrounds/bg_fashionable_001",    description:"패션형 전용 스튜디오 배경이에요." },
-  { id:"deco_fashionable_001", formKey:"fashionable",  category:"decoration", name:"드레스 행거",      price:20, asset:"/images/shop/decorations/deco_fashionable_001",  description:"예쁜 옷이 걸린 행거 장식이에요." },
+  { id:"deco_fashionable_001", formKey:"fashionable",  category:"decoration", name:"드레스 행거",      price:20, asset:"/images/shop/decorations/deco_fashionable_001",  description:"예쁜 옷이 걸린 행거 장식이에요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_fashionable_001_pet", allowedForms:["fashionable"],  hitRadiusPx:120, compositeWidthPx:600 } },
   { id:"bg_gluttonous_001",    formKey:"gluttonous",   category:"background", name:"달콤한 과자 나라", price:40, asset:"/images/shop/backgrounds/bg_gluttonous_001",     description:"먹보형 전용 달콤한 과자 나라 배경이에요." },
   { id:"deco_gluttonous_001",  formKey:"gluttonous",   category:"decoration", name:"배추 의자",        price:20, asset:"/images/shop/decorations/deco_gluttonous_001",   description:"먹보형 전용 아늑한 배추 의자예요.",
-    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_gluttonous_001_pet", allowedForms:["gluttonous"], hitRadiusPx:260, compositeWidthPx:600 } },
+    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_gluttonous_001_pet", allowedForms:["gluttonous"], hitRadiusPx:120, compositeWidthPx:600 } },
 ];
 
 const SHOP_MASTER = [
@@ -1049,7 +1054,7 @@ function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji
 }
 
 function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColor, feedSignal, homeBiasX = 0, showShopBubble, onShopBubble, onShopBubbleLock, interactiveDecosRef, activeInteractionRef, onInteractionStart, onInteractionEnd }) {
-  const wrapRef = useRef(null), imgRef = useRef(null), bubbleRef = useRef(null), bubbleTextRef = useRef(null), foodRef = useRef(null);
+  const wrapRef = useRef(null), imgRef = useRef(null), bubbleRef = useRef(null), bubbleTextRef = useRef(null), foodRef = useRef(null), nameRef = useRef(null);
   const feedSignalRef = useRef(feedSignal);
   useEffect(() => { feedSignalRef.current = feedSignal; }, [feedSignal]);  // 밥 신호를 루프가 ref로 읽음(루프 재시작 방지)
   const homeInitRef = useRef(false);  // true=진화 등 재실행, false=첫 마운트
@@ -1136,7 +1141,9 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
       let src = MOTIONS[key] || MOTIONS.stand;  // 키→src
       if (failedSrc.has(src)) src = MOTIONS.stand;  // 로드 실패한 감정 webp는 stand로 폴백
       if (src !== curSrc) { img.src = src; curSrc = src; }  // 바뀔 때만(애니 리셋 방지)
-      img.style.opacity = activeInteractionRef?.current ? "0" : "1";
+      const interacting = !!activeInteractionRef?.current;
+      img.style.opacity = interacting ? "0" : "1";
+      if (nameRef.current) nameRef.current.style.opacity = interacting ? "0" : "1";
       wrap.style.transform = `translate(${pet.x - scrollXRef.current - petSize / 2}px, ${pet.y - petSize / 2}px)`;  // 월드→화면: scrollX만큼 밀림(배경에 박힘)
       img.style.transform = `scaleX(${pet.facing})`;
       const footPct = ((pet.y + petSize / 2) / H) * 100;  // 동적 Y-정렬(데코와 동일 스케일)
@@ -1153,6 +1160,8 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
     let rafId = 0;
     function tick() {
       const t = now();
+      // 상호작용 중: 이동 로직 전부 스킵, 현재 위치에서 정지 상태 렌더만
+      if (activeInteractionRef?.current) { render(); rafId = requestAnimationFrame(tick); return; }
       if (feedSignalRef.current !== seenFeed) { seenFeed = feedSignalRef.current; if (pet.state !== "grabbed") startEating(); }
       switch (pet.state) {
         case "grabbed": break;
@@ -1202,7 +1211,7 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
         activeInteractionRef.current = null;
         onInteractionEndRef.current?.();
       }
-      down = { x: e.clientX, y: e.clientY, dragging: false };
+      down = { x: e.clientX, y: e.clientY, dragging: false, petX: pet.x, petY: pet.y };
     }
     function onMove(e) {
       if (!down) return;
@@ -1213,16 +1222,25 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
       if (!down) return;
       if (down.dragging) {
         home = { x: pet.x, y: pet.y }; pet.state = "idle"; idleUntil = now() + C.standAfterDrop;
-        // 상호작용 가구 히트 판정 (interactiveDecosRef: 현재 펫이 쓸 수 있는 가구만 담겨 있음)
-        const decos = interactiveDecosRef?.current || [];
-        let hit = null;
-        for (const d of decos) {
-          const furX = (d.pos.x / 100) * W;
-          const furY = (d.pos.y / 100) * H;
-          const hitR = ((d.item.interaction.hitRadiusPx ?? 220) / 1080) * W;
-          if (Math.hypot(pet.x - furX, pet.y - furY) < hitR + petSize / 2) { hit = d; break; }
+        // 히트 판정: 실제로 충분히 드래그했을 때만 (자율이동으로 가구 위에 있던 펫을 탭해도 미발동)
+        const dragDist = Math.hypot(pet.x - down.petX, pet.y - down.petY);
+        if (dragDist > petSize * 0.4) {
+          const decos = interactiveDecosRef?.current || [];
+          let hit = null, hitFurX = 0, hitFurY = 0;
+          for (const d of decos) {
+            const furX = (d.pos.x / 100) * W;
+            const furY = (d.pos.y / 100) * H;
+            const hitR = ((d.item.interaction.hitRadiusPx ?? 120) / REFERENCE_RESOLUTION.width) * W;
+            if (Math.hypot(pet.x - furX, pet.y - furY) < hitR) { hit = d; hitFurX = furX; hitFurY = furY; break; }
+          }
+          if (hit) {
+            // 가구가 벽 위에 배치된 경우 펫은 바닥 범위로 클램프 (벽 위 이동 방지)
+            const snapped = clampFloor(hitFurX, hitFurY);
+            pet.x = snapped.x; pet.y = snapped.y;
+            home = { x: snapped.x, y: snapped.y };
+            onInteractionStartRef.current?.(hit.iid, hit.item);
+          }
         }
-        if (hit) onInteractionStartRef.current?.(hit.iid, hit.item);
       } else handleTap();
       down = null;
     }
@@ -1267,7 +1285,7 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
         <span ref={bubbleTextRef}></span>
         <span style={{ position:"absolute", left:"50%", bottom:-7, transform:"translateX(-50%)", width:0, height:0, borderLeft:"6px solid transparent", borderRight:"6px solid transparent", borderTop:"7px solid #333" }}/>
       </div>
-      <div style={{ position:"absolute", left:"50%", top:"102%", transform:"translateX(-50%)", fontFamily:"'Jua',sans-serif", fontSize:13, color:"#fff", textShadow:"0 2px 10px rgba(0,0,0,.65)", whiteSpace:"nowrap", pointerEvents:"none" }}>{petName}</div>
+      <div ref={nameRef} style={{ position:"absolute", left:"50%", top:"102%", transform:"translateX(-50%)", fontFamily:"'Jua',sans-serif", fontSize:13, color:"#fff", textShadow:"0 2px 10px rgba(0,0,0,.65)", whiteSpace:"nowrap", pointerEvents:"none" }}>{petName}</div>
     </div>
   );
 }
@@ -1427,7 +1445,7 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, selected,
       onClick={draggable ? (e)=>{ e.stopPropagation(); onSelect?.(); } : undefined}
       style={{
         position:"absolute", left:`calc(${localPos.x}% - ${scrollX}px)`, top:`${localPos.y}%`,
-        transform:"translate(-50%,-50%)", zIndex: selected ? Math.max(depthZ, 160) : depthZ,
+        transform:"translate(-50%,-50%)", zIndex: depthZ,
         touchAction: (draggable && !fixed) ? "none" : "auto",
         userSelect:"none",
         pointerEvents: draggable ? "auto" : "none",
@@ -1441,12 +1459,12 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, selected,
           <img src={`${item.asset}.${SHOP_IMG_EXTS[assetExtIdx]}`} alt="" draggable={false}
             onError={() => setAssetExtIdx(i => i + 1)}
             onLoad={e => setNatural({ w:e.target.naturalWidth, h:e.target.naturalHeight })}
-            style={{ width: dispW ?? 60, height:"auto", display:"block", pointerEvents:"none", position:"relative", zIndex:1, opacity: isInteracting ? 0 : 1, transition:"opacity .15s" }}/>
+            style={{ width: dispW ?? 60, height:"auto", display:"block", pointerEvents:"none", position:"relative", zIndex:1, opacity: isInteracting ? 0 : 1, transition:"opacity .15s",  }}/>
         ) : item.imagePath && !imgFailed ? (
           <img src={item.imagePath} alt="" draggable={false}
             onError={() => setImgFailed(true)}
             onLoad={e => setNatural({ w:e.target.naturalWidth, h:e.target.naturalHeight })}
-            style={{ width: dispW ?? 60, height:"auto", display:"block", pointerEvents:"none", position:"relative", zIndex:1, opacity: isInteracting ? 0 : 1, transition:"opacity .15s" }}/>
+            style={{ width: dispW ?? 60, height:"auto", display:"block", pointerEvents:"none", position:"relative", zIndex:1, opacity: isInteracting ? 0 : 1, transition:"opacity .15s",  }}/>
         ) : (
           <span style={{ fontSize: Math.round((dispW ?? 60) * 0.62), lineHeight:1 }}>
             {CATEGORY_FALLBACK[item.category] || "🛍️"}
@@ -1457,7 +1475,7 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, selected,
         {draggable && selected && (
           <div style={{
             position:"absolute", top: flipBtnsBelow ? "calc(100% + 6px)" : -28, left:"50%", transform:"translateX(-50%)",
-            display:"flex", gap:4, whiteSpace:"nowrap",
+            display:"flex", gap:4, whiteSpace:"nowrap", zIndex:200,
           }}>
             <button
               onClick={e=>{ e.stopPropagation(); onFixToggle(); }}
@@ -1493,6 +1511,19 @@ function HomeLayout({
   const hasEvent = daily.event && !daily.eventRewardClaimed;
   const petColor = pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm].color : "#88d8b0";
 
+  const [evoBubbleDismissed, setEvoBubbleDismissed] = useState(false);
+  useEffect(() => { if (!canEvolve) setEvoBubbleDismissed(false); }, [canEvolve]);
+
+  // ── 꾸미기 draft 상태 ────────────────────────────────────
+  const [isDecorMode, setIsDecorMode]         = useState(false);
+  const [draftBg, setDraftBg]                 = useState(null);       // equipped background id
+  const [draftDecos, setDraftDecos]           = useState({});          // {[iid]: {itemId, isFixed, position}}
+  const [isDecorPanelOpen, setIsDecorPanelOpen] = useState(true);
+  const [isDraggingDecor, setIsDraggingDecor] = useState(false);
+  const [selectedDecoIid, setSelectedDecoIid] = useState(null);  // 선택된 데코(이 데코만 조작 버튼 표시)
+  const [isCleanMode, setIsCleanMode] = useState(false);         // 청소 모드 오버레이
+  const iidRef = useRef(0);  // 새 배치 인스턴스 iid 생성용 카운터
+
   // 가구 상호작용 — 현재 펫이 쓸 수 있는 가구만 ref에 유지, RAF loop가 드롭 판정 시 읽음
   const [activeInteractionIid, setActiveInteractionIid] = useState(null);
   const activeInteractionRef  = useRef(null);
@@ -1517,7 +1548,6 @@ function HomeLayout({
   const handleInteractionStart = useCallback((iid, item) => {
     if (!item?.interaction?.compositeAsset) return;
     pendingInteractionIid.current = iid;
-    let tried = 0;
     function tryLoad(extIdx) {
       if (extIdx >= SHOP_IMG_EXTS.length) return;  // 모든 확장자 실패 → 상호작용 미발동
       const img = new Image();
@@ -1534,19 +1564,6 @@ function HomeLayout({
 
   // 꾸미기 모드 진입 시 상호작용 해제
   useEffect(() => { if (isDecorMode) { pendingInteractionIid.current = null; setActiveInteractionIid(null); } }, [isDecorMode]);
-
-  const [evoBubbleDismissed, setEvoBubbleDismissed] = useState(false);
-  useEffect(() => { if (!canEvolve) setEvoBubbleDismissed(false); }, [canEvolve]);
-
-  // ── 꾸미기 draft 상태 ────────────────────────────────────
-  const [isDecorMode, setIsDecorMode]         = useState(false);
-  const [draftBg, setDraftBg]                 = useState(null);       // equipped background id
-  const [draftDecos, setDraftDecos]           = useState({});          // {[iid]: {itemId, isFixed, position}}
-  const [isDecorPanelOpen, setIsDecorPanelOpen] = useState(true);
-  const [isDraggingDecor, setIsDraggingDecor] = useState(false);
-  const [selectedDecoIid, setSelectedDecoIid] = useState(null);  // 선택된 데코(이 데코만 조작 버튼 표시)
-  const [isCleanMode, setIsCleanMode] = useState(false);         // 청소 모드 오버레이
-  const iidRef = useRef(0);  // 새 배치 인스턴스 iid 생성용 카운터
 
   const enterDecorMode = () => {
     const currentBg = (SHOP_MASTER.find(i => i.category==="background" && inv.shopItems?.[i.id]?.equipped) || {id:"bg_default"}).id;
@@ -1791,6 +1808,23 @@ function HomeLayout({
 // ===================================================
 // 방 배경 (가로 3배, 슬라이드 가능)
 // ===================================================
+function BgImage({ weather, scrollX, src, asset }) {
+  const [extIdx, setExtIdx] = useState(0);
+  const cur = asset ? `${asset}.${SHOP_IMG_EXTS[extIdx]}` : src;
+  if (asset && extIdx >= SHOP_IMG_EXTS.length) return null;
+  return (
+    <div style={{position:"absolute",inset:0,overflow:"hidden",zIndex:0}}>
+      <div style={{position:"absolute",inset:0,background:weatherSky(weather)}}/>
+      <WeatherFX weather={weather}/>
+      <img src={cur} alt="" draggable={false}
+        onError={() => asset && setExtIdx(i => i + 1)}
+        style={{position:"absolute",top:0,bottom:0,left:0,width:"300%",height:"100%",
+                objectFit:"cover",display:"block",
+                transform:`translateX(${-scrollX}px)`,willChange:"transform"}}/>
+    </div>
+  );
+}
+
 function RoomBackground({ weather, scrollX, equippedBg }) {
   // 뷰포트 px 측정 — 기본 창문들이 같은 하늘(뷰포트 좌표 정렬 날씨 필드)을 공유하기 위함
   const vpRef = useRef(null);
@@ -1803,18 +1837,13 @@ function RoomBackground({ weather, scrollX, equippedBg }) {
   }, []);
 
   // 커스텀 배경 이미지가 장착된 경우 이미지로 대체.
-  // 이미지 뒤에 날씨 백드롭(창문과 동일한 WEATHER_SKY + WeatherFX) → 투명 영역(예: 바닥만 있는 PNG)으로 같은 날씨가 비침.
-  if (equippedBg?.imagePath) {
-    return (
-      <div style={{position:"absolute",inset:0,overflow:"hidden",zIndex:0}}>
-        <div style={{position:"absolute",inset:0,background:weatherSky(weather)}}/>
-        <WeatherFX weather={weather}/>
-        <img src={equippedBg.imagePath} alt=""
-          style={{position:"absolute",top:0,bottom:0,left:0,width:"300%",height:"100%",
-                  objectFit:"cover",display:"block",
-                  transform:`translateX(${-scrollX}px)`,willChange:"transform"}}/>
-      </div>
-    );
+  // asset(다중 확장자 자동탐색) 또는 imagePath(레거시 고정경로) 지원.
+  // 이미지 뒤에 날씨 백드롭 → 투명 영역으로 같은 날씨가 비침.
+  const bgSrc = equippedBg?.asset
+    ? `${equippedBg.asset}.${SHOP_IMG_EXTS[0]}`  // 첫 번째 확장자로 시도, 실패 시 onError로 순환
+    : equippedBg?.imagePath || null;
+  if (bgSrc) {
+    return <BgImage weather={weather} scrollX={scrollX} src={bgSrc} asset={equippedBg?.asset}/>;
   }
   const skyBg = weatherSky(weather);
 
