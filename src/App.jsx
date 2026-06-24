@@ -257,7 +257,8 @@ const FORM_SHOP_ITEMS = [
   { id:"bg_fashionable_001",   formKey:"fashionable",  category:"background", name:"패션 스튜디오",    price:40, asset:"/images/shop/backgrounds/bg_fashionable_001",    description:"패션형 전용 스튜디오 배경이에요." },
   { id:"deco_fashionable_001", formKey:"fashionable",  category:"decoration", name:"드레스 행거",      price:20, asset:"/images/shop/decorations/deco_fashionable_001",  description:"예쁜 옷이 걸린 행거 장식이에요." },
   { id:"bg_gluttonous_001",    formKey:"gluttonous",   category:"background", name:"달콤한 과자 나라", price:40, asset:"/images/shop/backgrounds/bg_gluttonous_001",     description:"먹보형 전용 달콤한 과자 나라 배경이에요." },
-  { id:"deco_gluttonous_001",  formKey:"gluttonous",   category:"decoration", name:"간식 바구니",      price:20, asset:"/images/shop/decorations/deco_gluttonous_001",   description:"간식이 가득한 바구니 장식이에요." },
+  { id:"deco_gluttonous_001",  formKey:"gluttonous",   category:"decoration", name:"배추 의자",        price:20, asset:"/images/shop/decorations/deco_gluttonous_001",   description:"먹보형 전용 아늑한 배추 의자예요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_gluttonous_001_pet", allowedForms:["gluttonous"], hitRadiusPx:260, compositeWidthPx:600 } },
 ];
 
 const SHOP_MASTER = [
@@ -1020,7 +1021,7 @@ function petMotionOf(egg, pet) {
 function petColorOf(pet) { return pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm].color : "#88d8b0"; }
 
 // 모션 에셋 유무를 확인해 wandering / 정적 fallback 결정
-function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji, petName, petColor, feedSignal, homeBiasX = 0, showShopBubble, onShopBubble, onShopBubbleLock }) {
+function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji, petName, petColor, feedSignal, homeBiasX = 0, showShopBubble, onShopBubble, onShopBubbleLock, interactiveDecosRef, activeInteractionRef, onInteractionStart, onInteractionEnd }) {
   const [ready, setReady] = useState(null); // null=확인중, true=모션, false=정적fallback
   useEffect(() => {
     if (!motion?.stand || !motion?.walk) { setReady(false); return; }
@@ -1044,10 +1045,10 @@ function WanderingPet({ containerRef, scrollXRef, motion, staticImg, staticEmoji
       </div>
     );
   }
-  return <WanderingPetActive containerRef={containerRef} scrollXRef={scrollXRef} motion={motion} petName={petName} petColor={petColor} feedSignal={feedSignal} homeBiasX={homeBiasX} showShopBubble={showShopBubble} onShopBubble={onShopBubble} onShopBubbleLock={onShopBubbleLock}/>;
+  return <WanderingPetActive containerRef={containerRef} scrollXRef={scrollXRef} motion={motion} petName={petName} petColor={petColor} feedSignal={feedSignal} homeBiasX={homeBiasX} showShopBubble={showShopBubble} onShopBubble={onShopBubble} onShopBubbleLock={onShopBubbleLock} interactiveDecosRef={interactiveDecosRef} activeInteractionRef={activeInteractionRef} onInteractionStart={onInteractionStart} onInteractionEnd={onInteractionEnd}/>;
 }
 
-function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColor, feedSignal, homeBiasX = 0, showShopBubble, onShopBubble, onShopBubbleLock }) {
+function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColor, feedSignal, homeBiasX = 0, showShopBubble, onShopBubble, onShopBubbleLock, interactiveDecosRef, activeInteractionRef, onInteractionStart, onInteractionEnd }) {
   const wrapRef = useRef(null), imgRef = useRef(null), bubbleRef = useRef(null), bubbleTextRef = useRef(null), foodRef = useRef(null);
   const feedSignalRef = useRef(feedSignal);
   useEffect(() => { feedSignalRef.current = feedSignal; }, [feedSignal]);  // 밥 신호를 루프가 ref로 읽음(루프 재시작 방지)
@@ -1056,12 +1057,16 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
   const onShopBubbleRef = useRef(onShopBubble);
   const onShopBubbleLockRef = useRef(onShopBubbleLock);
   const bubbleLockedRef = useRef(false);
+  const onInteractionStartRef = useRef(onInteractionStart);
+  const onInteractionEndRef   = useRef(onInteractionEnd);
   useEffect(() => {
     showShopBubbleRef.current = showShopBubble;
     if (!showShopBubble) bubbleLockedRef.current = false; // 확인 완료 후 리셋
   }, [showShopBubble]);
   useEffect(() => { onShopBubbleRef.current = onShopBubble; }, [onShopBubble]);
   useEffect(() => { onShopBubbleLockRef.current = onShopBubbleLock; }, [onShopBubbleLock]);
+  useEffect(() => { onInteractionStartRef.current = onInteractionStart; }, [onInteractionStart]);
+  useEffect(() => { onInteractionEndRef.current = onInteractionEnd; }, [onInteractionEnd]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -1131,6 +1136,7 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
       let src = MOTIONS[key] || MOTIONS.stand;  // 키→src
       if (failedSrc.has(src)) src = MOTIONS.stand;  // 로드 실패한 감정 webp는 stand로 폴백
       if (src !== curSrc) { img.src = src; curSrc = src; }  // 바뀔 때만(애니 리셋 방지)
+      img.style.opacity = activeInteractionRef?.current ? "0" : "1";
       wrap.style.transform = `translate(${pet.x - scrollXRef.current - petSize / 2}px, ${pet.y - petSize / 2}px)`;  // 월드→화면: scrollX만큼 밀림(배경에 박힘)
       img.style.transform = `scaleX(${pet.facing})`;
       const footPct = ((pet.y + petSize / 2) / H) * 100;  // 동적 Y-정렬(데코와 동일 스케일)
@@ -1189,7 +1195,15 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
       const r = container.getBoundingClientRect();
       return clampFloor((e.clientX - r.left) + scrollXRef.current, e.clientY - r.top);
     }
-    function onDown(e) { e.preventDefault(); wrap.setPointerCapture?.(e.pointerId); down = { x: e.clientX, y: e.clientY, dragging: false }; }
+    function onDown(e) {
+      e.preventDefault(); wrap.setPointerCapture?.(e.pointerId);
+      // 잡는 순간 기존 상호작용 해제
+      if (activeInteractionRef?.current) {
+        activeInteractionRef.current = null;
+        onInteractionEndRef.current?.();
+      }
+      down = { x: e.clientX, y: e.clientY, dragging: false };
+    }
     function onMove(e) {
       if (!down) return;
       if (!down.dragging && Math.hypot(e.clientX - down.x, e.clientY - down.y) > C.dragThresh) { down.dragging = true; pet.state = "grabbed"; target = null; }
@@ -1197,8 +1211,19 @@ function WanderingPetActive({ containerRef, scrollXRef, motion, petName, petColo
     }
     function onUp() {
       if (!down) return;
-      if (down.dragging) { home = { x: pet.x, y: pet.y }; pet.state = "idle"; idleUntil = now() + C.standAfterDrop; } // 내려놓은 자리 = 새 활동중심
-      else handleTap();
+      if (down.dragging) {
+        home = { x: pet.x, y: pet.y }; pet.state = "idle"; idleUntil = now() + C.standAfterDrop;
+        // 상호작용 가구 히트 판정 (interactiveDecosRef: 현재 펫이 쓸 수 있는 가구만 담겨 있음)
+        const decos = interactiveDecosRef?.current || [];
+        let hit = null;
+        for (const d of decos) {
+          const furX = (d.pos.x / 100) * W;
+          const furY = (d.pos.y / 100) * H;
+          const hitR = ((d.item.interaction.hitRadiusPx ?? 220) / 1080) * W;
+          if (Math.hypot(pet.x - furX, pet.y - furY) < hitR + petSize / 2) { hit = d; break; }
+        }
+        if (hit) onInteractionStartRef.current?.(hit.iid, hit.item);
+      } else handleTap();
       down = null;
     }
     wrap.addEventListener("pointerdown", onDown);
@@ -1285,8 +1310,43 @@ function EggSelect({ onSelect }) {
 // 홈 레이아웃
 // ===================================================
 // 홈 꾸미기 모드 장식품 오버레이
+// 펫+가구 합성 이미지 오버레이 — 상호작용 중에만 렌더. 가구와 동일 좌표계에 배치.
+// compositeAsset(확장자 없음) → webp/png/jpg 순으로 탐색 (로드 실패 시 자동 전환).
+function CompositeOverlay({ item, pos, scrollX, containerRef }) {
+  const ia = item.interaction;
+  const [box, setBox] = useState({ w:0, h:0 });
+  const [extIdx, setExtIdx] = useState(0);
+  useEffect(() => {
+    const measure = () => setBox({ w: containerRef.current?.offsetWidth||0, h: containerRef.current?.offsetHeight||0 });
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [containerRef]);
+  useEffect(() => { setExtIdx(0); }, [ia.compositeAsset]);
+
+  const dispW = box.w ? ((ia.compositeWidthPx ?? 400) / REFERENCE_RESOLUTION.width) * box.w : 0;
+  const baseY = pos.y;  // 가구 중심 y% 그대로 사용 — 합성 이미지가 가구를 포함하므로 위치 일치
+  const depthZ = Math.round(Math.min(150, Math.max(1, baseY))) + 1;
+
+  if (!ia.compositeAsset || extIdx >= SHOP_IMG_EXTS.length) return null;
+  return (
+    <div style={{
+      position:"absolute", left:`calc(${pos.x}% - ${scrollX}px)`, top:`${pos.y}%`,
+      transform:"translate(-50%,-50%)", zIndex:depthZ, pointerEvents:"none",
+      animation:"fadeIn .15s ease",
+    }}>
+      <img
+        src={`${ia.compositeAsset}.${SHOP_IMG_EXTS[extIdx]}`}
+        alt="" draggable={false}
+        onError={() => setExtIdx(i => i + 1)}
+        style={{ width: dispW || "auto", height:"auto", display:"block" }}
+      />
+    </div>
+  );
+}
+
 // isFixed=false: 드래그 가능 / isFixed=true: 위치 고정
-function DecorationOverlay({ item, itemState, containerRef, draggable, selected, onSelect, onFixToggle, onRemove, onMove, onDragStart, scrollX = 0, weather }) {
+function DecorationOverlay({ item, itemState, containerRef, draggable, selected, onSelect, onFixToggle, onRemove, onMove, onDragStart, scrollX = 0, weather, isInteracting = false }) {
   const [localPos, setLocalPos] = useState(itemState.position);
   const dragRef = useRef({ active:false, startX:0, startY:0, startPos:{x:0,y:0} });
 
@@ -1295,8 +1355,11 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, selected,
   // 기준 해상도 비율 기반 크기 — 원본 px ÷ 기준 폭 × 실제 컨테이너 폭 × scale
   const [natural, setNatural] = useState(null);   // 에셋 원본 px {w,h}
   const [box, setBox]         = useState({ w:0, h:0 }); // 컨테이너(화면) px
+  // asset 다중 확장자 탐색 (SHOP_IMG_EXTS 순서: webp→png→jpg)
+  const [assetExtIdx, setAssetExtIdx] = useState(0);
   const [imgFailed, setImgFailed] = useState(false);
-  useEffect(() => { setImgFailed(false); }, [item.imagePath]);
+  const imgKey = item.asset || item.imagePath || "";
+  useEffect(() => { setImgFailed(false); setAssetExtIdx(0); }, [imgKey]);
   useEffect(() => {
     const measure = () => setBox({ w: containerRef.current?.offsetWidth || 0, h: containerRef.current?.offsetHeight || 0 });
     measure();
@@ -1373,11 +1436,17 @@ function DecorationOverlay({ item, itemState, containerRef, draggable, selected,
       <div style={{position:"relative"}}>
         {/* 창문: 프레임 PNG 뒤(zIndex 0)에 유리 클립 날씨 → 프레임이 위(zIndex 1)에서 덮음 */}
         {outside && <WindowOutside weather={weather} {...outside}/>}
-        {item.imagePath && !imgFailed ? (
+        {/* asset(다중 확장자 자동탐색) → imagePath(레거시 고정경로) → 이모지 fallback */}
+        {item.asset && assetExtIdx < SHOP_IMG_EXTS.length ? (
+          <img src={`${item.asset}.${SHOP_IMG_EXTS[assetExtIdx]}`} alt="" draggable={false}
+            onError={() => setAssetExtIdx(i => i + 1)}
+            onLoad={e => setNatural({ w:e.target.naturalWidth, h:e.target.naturalHeight })}
+            style={{ width: dispW ?? 60, height:"auto", display:"block", pointerEvents:"none", position:"relative", zIndex:1, opacity: isInteracting ? 0 : 1, transition:"opacity .15s" }}/>
+        ) : item.imagePath && !imgFailed ? (
           <img src={item.imagePath} alt="" draggable={false}
             onError={() => setImgFailed(true)}
             onLoad={e => setNatural({ w:e.target.naturalWidth, h:e.target.naturalHeight })}
-            style={{ width: dispW ?? 60, height:"auto", display:"block", pointerEvents:"none", position:"relative", zIndex:1 }}/>
+            style={{ width: dispW ?? 60, height:"auto", display:"block", pointerEvents:"none", position:"relative", zIndex:1, opacity: isInteracting ? 0 : 1, transition:"opacity .15s" }}/>
         ) : (
           <span style={{ fontSize: Math.round((dispW ?? 60) * 0.62), lineHeight:1 }}>
             {CATEGORY_FALLBACK[item.category] || "🛍️"}
@@ -1423,6 +1492,48 @@ function HomeLayout({
 }) {
   const hasEvent = daily.event && !daily.eventRewardClaimed;
   const petColor = pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm].color : "#88d8b0";
+
+  // 가구 상호작용 — 현재 펫이 쓸 수 있는 가구만 ref에 유지, RAF loop가 드롭 판정 시 읽음
+  const [activeInteractionIid, setActiveInteractionIid] = useState(null);
+  const activeInteractionRef  = useRef(null);
+  const interactiveDecosRef   = useRef([]);
+  const pendingInteractionIid = useRef(null);
+  useEffect(() => { activeInteractionRef.current = activeInteractionIid; }, [activeInteractionIid]);
+
+  // 현재 펫이 상호작용 가능한 배치된 가구 목록 유지
+  useEffect(() => {
+    if (isDecorMode) { interactiveDecosRef.current = []; return; }
+    interactiveDecosRef.current = (inv.placedDecos || [])
+      .map(p => ({ iid:p.iid, item:SHOP_MASTER.find(m=>m.id===p.itemId), pos:p.position }))
+      .filter(({ item }) => {
+        if (!item?.interaction?.enabled) return false;
+        if (pet.stage !== 3 || !pet.finalForm) return false;
+        if (item.interaction.allowedForms && !item.interaction.allowedForms.includes(pet.finalForm)) return false;
+        return true;
+      });
+  }, [inv.placedDecos, pet.stage, pet.finalForm, isDecorMode]);
+
+  // 상호작용 시작: 합성 이미지 미리 로드 후 activeInteractionIid 확정 (깜빡임 방지)
+  const handleInteractionStart = useCallback((iid, item) => {
+    if (!item?.interaction?.compositeAsset) return;
+    pendingInteractionIid.current = iid;
+    let tried = 0;
+    function tryLoad(extIdx) {
+      if (extIdx >= SHOP_IMG_EXTS.length) return;  // 모든 확장자 실패 → 상호작용 미발동
+      const img = new Image();
+      img.onload = () => { if (pendingInteractionIid.current === iid) setActiveInteractionIid(iid); };
+      img.onerror = () => tryLoad(extIdx + 1);
+      img.src = `${item.interaction.compositeAsset}.${SHOP_IMG_EXTS[extIdx]}`;
+    }
+    tryLoad(0);
+  }, []);
+  const handleInteractionEnd = useCallback(() => {
+    pendingInteractionIid.current = null;
+    setActiveInteractionIid(null);
+  }, []);
+
+  // 꾸미기 모드 진입 시 상호작용 해제
+  useEffect(() => { if (isDecorMode) { pendingInteractionIid.current = null; setActiveInteractionIid(null); } }, [isDecorMode]);
 
   const [evoBubbleDismissed, setEvoBubbleDismissed] = useState(false);
   useEffect(() => { if (!canEvolve) setEvoBubbleDismissed(false); }, [canEvolve]);
@@ -1571,8 +1682,16 @@ function HomeLayout({
             onDragStart={isDecorMode ? () => { setIsDraggingDecor(true); setIsDecorPanelOpen(false); } : undefined}
             scrollX={scrollX}
             weather={weather}
+            isInteracting={!isDecorMode && activeInteractionIid === iid}
           />
         ))}
+
+        {/* 합성 이미지 오버레이 — 상호작용 가구 위에 펫+가구 합성 이미지 표시 */}
+        {!isDecorMode && activeInteractionIid && (() => {
+          const d = displayDecos.find(x => x.iid === activeInteractionIid);
+          if (!d?.item?.interaction?.compositeAsset) return null;
+          return <CompositeOverlay key={activeInteractionIid} item={d.item} pos={d.state.position} scrollX={scrollX} containerRef={midRef}/>;
+        })()}
 
         {/* 꾸미기 모드 — 상단 완료/취소 바 */}
         {isDecorMode && (
@@ -1622,6 +1741,10 @@ function HomeLayout({
             showShopBubble={pet.stage===3 && !!pet.finalForm && !inv.formEvents?.[pet.finalForm]?.shopEventDone}
             onShopBubble={onFormShopEvent}
             onShopBubbleLock={onShopBubbleLock}
+            interactiveDecosRef={interactiveDecosRef}
+            activeInteractionRef={activeInteractionRef}
+            onInteractionStart={handleInteractionStart}
+            onInteractionEnd={handleInteractionEnd}
           />
         )}
 
@@ -2418,12 +2541,35 @@ function GiftDetailPopup({ gift, count, daily, onGive, onSell, onClose }) {
   const unitPrice = GIFT_SELL_PRICE[gift.grade];
   const [sellMode, setSellMode] = useState(false);
   const [qty, setQty] = useState(1);
+  const [confirmGive, setConfirmGive] = useState(false);
   useEffect(() => { setQty(q => Math.max(1, Math.min(q, count))); }, [count]);  // 보유 수량 변동 시 qty 보정
   return (
     <div onClick={onClose}
       style={{position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,.65)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div onClick={e=>e.stopPropagation()}
         style={{width:"100%",maxWidth:430,background:"linear-gradient(160deg,#3a2d6e,#5b3fa0)",borderRadius:"24px 24px 0 0",padding:"24px 24px 36px",display:"flex",flexDirection:"column",alignItems:"center",gap:13,animation:"fadeUp .25s ease",position:"relative"}}>
+        {/* 선물 주기 확인 팝업 */}
+        {confirmGive && (
+          <div onClick={()=>setConfirmGive(false)}
+            style={{position:"fixed",inset:0,zIndex:400,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div onClick={e=>e.stopPropagation()}
+              style={{background:"#1e1438",border:"1.5px solid rgba(255,255,255,.2)",borderRadius:20,padding:"28px 24px",width:"80%",maxWidth:300,textAlign:"center"}}>
+              <div style={{fontSize:36,marginBottom:10}}>🎁</div>
+              <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:6}}>{gift.name}</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,.6)",marginBottom:20}}>선물을 줄까요?</div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>setConfirmGive(false)}
+                  style={{flex:1,padding:"10px 0",borderRadius:12,border:"1.5px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.08)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Jua',sans-serif"}}>
+                  취소
+                </button>
+                <button onClick={()=>{ setConfirmGive(false); onGive(); }}
+                  style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",background:"linear-gradient(135deg,#FF6B6B,#FF8E53)",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Jua',sans-serif"}}>
+                  확인🎁
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* 닫기 */}
         <button onClick={onClose}
           style={{position:"absolute",top:14,right:18,background:"rgba(255,255,255,.15)",border:"none",borderRadius:"50%",width:30,height:30,fontSize:16,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
@@ -2442,7 +2588,7 @@ function GiftDetailPopup({ gift, count, daily, onGive, onSell, onClose }) {
         <div style={{fontSize:13,color:"rgba(255,255,255,.5)"}}>보유 수량 <b style={{color:"#fff"}}>{count}개</b></div>
         {/* 선물 주기 | 판매 (나란히) */}
         <div style={{display:"flex",gap:10,width:"100%",maxWidth:280}}>
-          <button onClick={onGive} disabled={done}
+          <button onClick={done ? undefined : () => setConfirmGive(true)} disabled={done}
             style={{flex:1.3,padding:"12px 0",borderRadius:14,border:"none",cursor:done?"not-allowed":"pointer",background:done?"rgba(255,255,255,.1)":"linear-gradient(135deg,#FF6B6B,#FF8E53)",color:done?"rgba(255,255,255,.3)":"#fff",fontWeight:800,fontSize:14,fontFamily:"'Jua',sans-serif"}}>
             {done ? "선물 완료 ✓" : `선물 주기 🎁 (${daily.giftCount??0}/2)`}
           </button>
@@ -3120,6 +3266,7 @@ function OutingScreen({ egg, pet, inv, weather, onBack }) {
 
   const doCopy = () => { try { navigator.clipboard?.writeText(myCode); setCopied(true); setTimeout(()=>setCopied(false), 1500); } catch {} };
   const doVisit = () => {
+    if (input.trim() === myCode.trim()) { setErr("내 집은 놀러갈 수 없어요."); return; }
     const data = parseVisitCode(input);
     if (!data) { setErr("코드를 읽을 수 없어요. 다시 확인해 주세요."); return; }
     setErr(""); setVisit(data);
