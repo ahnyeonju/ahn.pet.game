@@ -1957,7 +1957,7 @@ function TopBar({ pet, inv, daily, growthPct, growthMax, getPetEmoji, getPetName
   }, []);
 
   return (
-    <div style={{background:"rgba(255,255,255,.18)",backdropFilter:"blur(12px)",borderBottom:"1px solid rgba(255,255,255,.2)",padding:"8px 12px",display:"flex",alignItems:"center",gap:8,zIndex:10,flexShrink:0}}>
+    <div style={{background:"rgba(255,255,255,.18)",backdropFilter:"blur(12px)",borderBottom:"1px solid rgba(255,255,255,.2)",padding:"8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left))",display:"flex",alignItems:"center",gap:8,zIndex:10,flexShrink:0}}>
 
       {/* 펫 프로필 버튼 */}
       <button onClick={onStatusCheck} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,.25)",border:"2px solid rgba(255,255,255,.4)",borderRadius:18,padding:"5px 10px 5px 6px",cursor:"pointer",flexShrink:0}}>
@@ -2004,7 +2004,7 @@ function TopBar({ pet, inv, daily, growthPct, growthMax, getPetEmoji, getPetName
       </button>
 
       {/* 공유 */}
-      <div style={{position:"relative"}}>
+      <div style={{position:"relative",flexShrink:0}}>
         <button
           onClick={onShare}
           style={{background:"rgba(255,255,255,.2)",border:"1.5px solid rgba(255,255,255,.3)",borderRadius:14,padding:"6px 10px",cursor:"pointer",fontSize:16}}>
