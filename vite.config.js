@@ -29,20 +29,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // 앱 셸·펫 모션·아이콘·폰트(self-host)는 precache. 무거운 배경/데코 png만 런타임 캐시.
-        globPatterns: ['**/*.{js,css,html,webp,woff2}', 'icon-*.png'],
-        runtimeCaching: [
-          {
-            // 배경·데코 등 이미지: 처음 받을 때 캐시 → 이후 오프라인 제공
-            urlPattern: ({ request }) => request.destination === 'image',
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'images',
-              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
+        // NFC 시나리오: 첫 접속 시 전체 리소스 precache → 이후 완전 오프라인 동작.
+        // png/jpg도 포함해야 미해금 배경·장식이 오프라인에서 로딩됨.
+        globPatterns: ['**/*.{js,css,html,webp,woff2,png,jpg}'],
+        globIgnores: ['**/node_modules/**', '**/sw.js', '**/workbox-*.js', '**/_originals/**'],
       },
     }),
   ],
