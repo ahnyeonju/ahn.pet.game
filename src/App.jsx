@@ -537,32 +537,35 @@ export default function App() {
     };
   }, []);
 
-  // ref를 최신 screen·popup 값으로 동기화
-  useEffect(() => { screenRef.current = screen; }, [screen]);
-  useEffect(() => { popupRef.current  = popup;  }, [popup]);
+  const [exitConfirm, setExitConfirm] = useState(false);
+  const exitConfirmRef = useRef(false);
 
-  // 안드로이드 백버튼 → 서브화면 닫기 or 종료 확인
+  // ref를 최신 screen·popup·exitConfirm 값으로 동기화
+  useEffect(() => { screenRef.current      = screen;      }, [screen]);
+  useEffect(() => { popupRef.current       = popup;       }, [popup]);
+  useEffect(() => { exitConfirmRef.current = exitConfirm; }, [exitConfirm]);
+
+  // 백버튼 → 서브화면 닫기 or 종료 확인 오버레이
   useEffect(() => {
     history.pushState({ tama: true }, '');
     const handler = () => {
       const s = screenRef.current;
       const p = popupRef.current;
-      if (p) {
-        // 팝업 열려있으면 닫기
+      const ex = exitConfirmRef.current;
+      if (ex) {
+        // 종료 확인 중 → 취소
+        setExitConfirm(false);
+        history.pushState({ tama: true }, '');
+      } else if (p) {
         setPopup(null);
         history.pushState({ tama: true }, '');
       } else if (s !== 'home' && s !== 'egg_select') {
-        // 서브 화면 → 홈으로
         setScreen('home');
         history.pushState({ tama: true }, '');
       } else {
-        // 홈/알 선택 → 종료 확인
-        if (window.confirm('게임을 종료하겠습니까?')) {
-          window.close();               // PWA(홈 추가) 종료 시도
-          setTimeout(() => history.go(-(history.length)), 100); // 차단된 경우 대비
-        } else {
-          history.pushState({ tama: true }, '');
-        }
+        // 홈/알 선택 → 커스텀 종료 확인 오버레이 표시
+        setExitConfirm(true);
+        history.pushState({ tama: true }, '');
       }
     };
     window.addEventListener('popstate', handler);
@@ -922,6 +925,26 @@ export default function App() {
       <style>{CSS}</style>
       <div className="shell" style={{ background: screen!=="home" ? SCREEN_BG : weatherSky(weather), transition:"background 1.2s ease" }}>
         {toast && <Toast {...toast}/>}
+
+        {exitConfirm && (
+          <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.55)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{background:"#fff",borderRadius:20,padding:"28px 24px",width:"80%",maxWidth:280,textAlign:"center",boxShadow:"0 8px 32px rgba(0,0,0,.18)"}}>
+              <div style={{fontSize:36,marginBottom:12}}>👋</div>
+              <div style={{fontFamily:"'Jua',sans-serif",fontSize:18,color:"#333",marginBottom:8}}>게임을 종료하겠습니까?</div>
+              <div style={{fontFamily:"'Nunito',sans-serif",fontSize:13,color:"#888",marginBottom:24}}>진행 상황은 자동 저장됩니다.</div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>setExitConfirm(false)}
+                  style={{flex:1,padding:"12px 0",borderRadius:12,border:"1.5px solid #ddd",background:"#f5f5f5",fontFamily:"'Jua',sans-serif",fontSize:15,cursor:"pointer",color:"#666"}}>
+                  취소
+                </button>
+                <button onClick={()=>{ window.close(); setTimeout(()=>history.go(-history.length),100); }}
+                  style={{flex:1,padding:"12px 0",borderRadius:12,border:"none",background:"#ff6b6b",fontFamily:"'Jua',sans-serif",fontSize:15,cursor:"pointer",color:"#fff"}}>
+                  종료
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {screen==="egg_select" && <EggSelect onSelect={handleEggSelect}/>}
 

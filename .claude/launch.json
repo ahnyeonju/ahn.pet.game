@@ -16,6 +16,14 @@
       "runtimeArgs": ["run", "dev:phone"],
       "port": 5173,
       "autoPort": false
+    },
+    {
+      "name": "preview",
+      "description": "빌드 결과 미리보기 (PWA/SW 테스트용)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview"],
+      "port": 4173,
+      "autoPort": false
     }
   ]
 }
