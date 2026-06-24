@@ -81,10 +81,40 @@
 
 ---
 
-## 7. 다음 단계 (TODO)
+## 7. 배포 (GitHub Pages)
+
+**공개 URL (NFC 스티커 등록용)**
+```
+https://ahnyeonju.github.io/ahn.pet.game/
+```
+
+**레포 구조**
+- `origin` → `https://github.com/ahnyeonju/tama-game` (private, 개발 히스토리 보존)
+- `public` → `https://github.com/ahnyeonju/ahn.pet.game` (public, Pages 배포용)
+
+**업데이트 push 명령 (매번 두 줄 실행)**
+```bash
+git push origin pet-motion-poc          # private 레포 (개발 히스토리)
+git push public public-main:main        # public 레포 → Actions 자동 빌드 (~30초 후 반영)
+```
+
+**자동화 흐름**
+```
+git push public → GitHub Actions (npm ci + npm run build) → gh-pages 브랜치 → Pages 배포
+```
+
+**주의사항**
+- 공개 레포(`ahn.pet.game`)에는 저작권 문제 이미지 제외 후 push할 것.
+- `vite.config.js`에 `base: '/ahn.pet.game/'` 설정됨. 이걸 제거하면 로컬도 망가짐.
+- `src/App.jsx` 최상단에 `const BASE = import.meta.env.BASE_URL;` 선언됨. 이미지·폰트 경로가 전부 이 변수로 시작함.
+- 공개 레포 로컬 브랜치명: `public-main` → 원격 `main` 으로 push.
+
+---
+
+## 8. 다음 단계 (TODO)
 
 - [ ] **놀러가기 Phase 2** — WebRTC P2P + 코드 핸드셰이크 라이브 미러링(무서버). 펫 모션을 "원격 데이터 구동" 모드로 분리가 주 작업.
-- [ ] **NFC** — 안드로이드 웹(Web NFC)에서 세이브 코드 ↔ 태그. iOS 웹은 불가(보너스 기능으로). 
+- [ ] **NFC** — 안드로이드 웹(Web NFC)에서 세이브 코드 ↔ 태그. iOS 웹은 불가(보너스 기능으로).
 - [ ] **3단계(stage3) 펫 에셋** — 현재 폴더 비어 이모지 폴백. 에셋 들어오면 자동 적용.
 - [ ] **고유 스킬(AI)·대회** — 사용자 "구현해줘" 시 작성(P6).
 - [ ] PWA 아이콘 정식 디자인 교체.
