@@ -467,6 +467,7 @@ body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-conten
 .shell{width:min(100vw,420px);flex-shrink:0;height:100dvh;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
 @media(min-width:480px){.shell{border-radius:36px;height:910px;max-height:910px;}}
 @keyframes bounce{0%,100%{transform:translateY(0);opacity:.6}50%{transform:translateY(-8px);opacity:1}}
+@keyframes swProgress{0%{width:0%}60%{width:75%}85%{width:87%}100%{width:90%}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
 @keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
@@ -513,11 +514,15 @@ export default function App() {
   const newPetRef = useRef(false);  // "다른 펫 키우기" 진입 시 handleEggSelect가 inv·daily를 보존하도록 표시
   const [feedTick, setFeedTick] = useState(0);  // 밥 줄 때마다 증가 → 펫이 밥 먹는 연출 트리거
   // dev는 SW 없으므로 즉시 ready. prod는 precache 완료(=SW active) 대기.
-  const [swReady, setSwReady] = useState(import.meta.env.DEV || !('serviceWorker' in navigator));
+  const [swReady,    setSwReady]    = useState(import.meta.env.DEV || !('serviceWorker' in navigator));
+  const [swComplete, setSwComplete] = useState(false); // true → 게이지 100% 후 화면 전환
 
   useEffect(() => {
     if (swReady) return;
-    navigator.serviceWorker.ready.then(() => setSwReady(true));
+    navigator.serviceWorker.ready.then(() => {
+      setSwComplete(true);                          // 게이지 100%로 점프
+      setTimeout(() => setSwReady(true), 500);      // 500ms 후 게임 진입
+    });
   }, []);
 
   const weather = (import.meta.env.DEV && devWeather) ? devWeather : getWeather();
@@ -853,9 +858,17 @@ export default function App() {
         <div style={{fontFamily:"'Nunito',sans-serif",fontSize:13,color:"rgba(255,255,255,.85)",textAlign:"center",lineHeight:1.7}}>
           첫 실행 시 게임 리소스를 한 번만 다운로드합니다.<br/>Wi-Fi를 유지한 채로 잠시 기다려 주세요.
         </div>
-        <div style={{display:"flex",gap:8,marginTop:8}}>
+        <div style={{width:"70%",maxWidth:260,height:8,background:"rgba(255,255,255,.25)",borderRadius:8,overflow:"hidden",marginTop:16}}>
+          <div style={{
+            height:"100%",background:"rgba(255,255,255,.9)",borderRadius:8,
+            width: swComplete ? "100%" : undefined,
+            animation: swComplete ? "none" : "swProgress 30s ease-out forwards",
+            transition: swComplete ? "width 0.4s ease" : "none",
+          }}/>
+        </div>
+        <div style={{display:"flex",gap:8,marginTop:12}}>
           {[0,1,2].map(i=>(
-            <div key={i} style={{width:10,height:10,borderRadius:"50%",background:"rgba(255,255,255,.9)",animation:`bounce 1.2s ease-in-out ${i*0.2}s infinite`}}/>
+            <div key={i} style={{width:8,height:8,borderRadius:"50%",background:"rgba(255,255,255,.9)",animation:`bounce 1.2s ease-in-out ${i*0.2}s infinite`}}/>
           ))}
         </div>
       </div>
