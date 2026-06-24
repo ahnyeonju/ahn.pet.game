@@ -466,6 +466,7 @@ html{overflow:hidden;height:100%;}
 body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-content:center;align-items:center;height:100%;overflow:hidden;position:fixed;width:100%;touch-action:none;overscroll-behavior:none;}
 .shell{width:min(100vw,420px);flex-shrink:0;height:100dvh;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
 @media(min-width:480px){.shell{border-radius:36px;height:910px;max-height:910px;}}
+@keyframes bounce{0%,100%{transform:translateY(0);opacity:.6}50%{transform:translateY(-8px);opacity:1}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
 @keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
@@ -511,6 +512,13 @@ export default function App() {
   const [devWeather, setDevWeather] = useState(null); // null = 실제 날씨 사용
   const newPetRef = useRef(false);  // "다른 펫 키우기" 진입 시 handleEggSelect가 inv·daily를 보존하도록 표시
   const [feedTick, setFeedTick] = useState(0);  // 밥 줄 때마다 증가 → 펫이 밥 먹는 연출 트리거
+  // dev는 SW 없으므로 즉시 ready. prod는 precache 완료(=SW active) 대기.
+  const [swReady, setSwReady] = useState(import.meta.env.DEV || !('serviceWorker' in navigator));
+
+  useEffect(() => {
+    if (swReady) return;
+    navigator.serviceWorker.ready.then(() => setSwReady(true));
+  }, []);
 
   const weather = (import.meta.env.DEV && devWeather) ? devWeather : getWeather();
   const wm = WEATHER_META[weather];
@@ -835,6 +843,24 @@ export default function App() {
   const growthMax = pet.stage===1 ? GROWTH_THRESHOLDS.stage2 : GROWTH_THRESHOLDS.stage3;
   const growthPct = Math.min(100,(pet.growthPoint/growthMax)*100);
   const missionDone = ["feed","play","clean","gift","statusCheck"].filter(k=>daily.missions[k]).length;
+
+  if (!swReady) return (
+    <>
+      <style>{CSS}</style>
+      <div className="shell" style={{background:"#88d8b0",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:32}}>
+        <div style={{fontSize:64}}>🥚</div>
+        <div style={{fontFamily:"'Jua',sans-serif",fontSize:22,color:"#fff",textShadow:"0 2px 8px rgba(0,0,0,.2)"}}>오프라인 플레이 준비 중…</div>
+        <div style={{fontFamily:"'Nunito',sans-serif",fontSize:13,color:"rgba(255,255,255,.85)",textAlign:"center",lineHeight:1.7}}>
+          첫 실행 시 게임 리소스를 한 번만 다운로드합니다.<br/>Wi-Fi를 유지한 채로 잠시 기다려 주세요.
+        </div>
+        <div style={{display:"flex",gap:8,marginTop:8}}>
+          {[0,1,2].map(i=>(
+            <div key={i} style={{width:10,height:10,borderRadius:"50%",background:"rgba(255,255,255,.9)",animation:`bounce 1.2s ease-in-out ${i*0.2}s infinite`}}/>
+          ))}
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <>
