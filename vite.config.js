@@ -5,6 +5,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // HTTPS 환경변수가 있을 때만 자체 서명 HTTPS 적용(폰 카메라 테스트용). 평소 dev는 http 유지.
 export default defineConfig({
+  base: '/ahn.pet.game/',
   plugins: [
     react(),
     ...(process.env.HTTPS ? [basicSsl()] : []),
@@ -20,7 +21,7 @@ export default defineConfig({
         background_color: '#111111',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
+        start_url: '/ahn.pet.game/',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

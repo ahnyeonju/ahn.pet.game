@@ -105,6 +105,11 @@ const LZString = (function() {
 })();
 
 // ===================================================
+// 배포 기반 경로 (dev: '/', prod: '/ahn.pet.game/')
+// ===================================================
+const BASE = import.meta.env.BASE_URL;
+
+// ===================================================
 // 마스터 데이터
 // ===================================================
 const GROWTH_THRESHOLDS = { stage2: 40, stage3: 100 };
@@ -196,12 +201,12 @@ const WEATHER_SKY = {
 // 어떤 이미지도 없으면 WEATHER_SKY 그라데이션으로 폴백. WeatherFX(비·눈)는 항상 위에 유지.
 const WEATHER_IMG_EXTS = ["webp", "png", "jpg"];  // 우선순위 순(앞이 위 레이어). 확장자 추가 가능.
 const WEATHER_SKY_IMG = {
-  sunny:  "/images/weather/sunny",
-  rain:   "/images/weather/rain",
-  snow:   "/images/weather/snow",
-  cloudy: "/images/weather/cloudy",
-  night:  "/images/weather/night",
-  sunset: "/images/weather/sunset",
+  sunny:  `${BASE}images/weather/sunny`,
+  rain:   `${BASE}images/weather/rain`,
+  snow:   `${BASE}images/weather/snow`,
+  cloudy: `${BASE}images/weather/cloudy`,
+  night:  `${BASE}images/weather/night`,
+  sunset: `${BASE}images/weather/sunset`,
 };
 // 날씨 하늘의 CSS background 값 — 베이스 경로가 있으면 확장자별 url 레이어(존재하는 것만 표시) + 그라데이션 폴백.
 function weatherSky(weather) {
@@ -246,24 +251,24 @@ const GIFT_SHOP_ITEMS = GIFT_MASTER.map(g => ({
 // asset은 확장자 없는 경로 — ShopItemImage가 webp/png/jpg 순으로 시도.
 // 아이템 추가 시 이 배열에만 추가하면 Shop·구매·저장 모두 자동 반영.
 const FORM_SHOP_ITEMS = [
-  { id:"bg_energetic_001",     formKey:"energetic",    category:"background", name:"활기찬 놀이터",    price:40, asset:"/images/shop/backgrounds/bg_energetic_001",     description:"장난꾸러기형 전용 활기찬 놀이터 배경이에요." },
-  { id:"deco_energetic_001",   formKey:"energetic",    category:"decoration", name:"장난감 바구니",    price:20, asset:"/images/shop/decorations/deco_energetic_001",   description:"장난감이 가득한 바구니 장식이에요.",
-    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_energetic_001_pet",   allowedForms:["energetic"],    hitRadiusPx:120, compositeWidthPx:600 } },
-  { id:"bg_intelligent_001",   formKey:"intelligent",  category:"background", name:"별빛 서재",        price:40, asset:"/images/shop/backgrounds/bg_intelligent_001",    description:"똑똑형 전용 별빛 서재 배경이에요." },
-  { id:"deco_intelligent_001", formKey:"intelligent",  category:"decoration", name:"책 탑",            price:20, asset:"/images/shop/decorations/deco_intelligent_001",  description:"높이 쌓인 책 탑 장식이에요.",
-    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_intelligent_001_pet", allowedForms:["intelligent"],  hitRadiusPx:120, compositeWidthPx:600 } },
-  { id:"bg_affectionate_001",  formKey:"affectionate", category:"background", name:"포근한 침대방",    price:40, asset:"/images/shop/backgrounds/bg_affectionate_001",   description:"포근형 전용 아늑한 방 배경이에요." },
-  { id:"deco_affectionate_001",formKey:"affectionate", category:"decoration", name:"하트 쿠션",        price:20, asset:"/images/shop/decorations/deco_affectionate_001", description:"포근한 하트 쿠션 장식이에요.",
-    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_affectionate_001_pet",allowedForms:["affectionate"], hitRadiusPx:120, compositeWidthPx:600 } },
-  { id:"bg_lucky_001",         formKey:"lucky",        category:"background", name:"마법의 별숲",      price:40, asset:"/images/shop/backgrounds/bg_lucky_001",          description:"신비형 전용 마법의 별숲 배경이에요." },
-  { id:"deco_lucky_001",       formKey:"lucky",        category:"decoration", name:"행운의 별",        price:20, asset:"/images/shop/decorations/deco_lucky_001",        description:"빛나는 행운의 별 장식이에요.",
-    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_lucky_001_pet",       allowedForms:["lucky"],        hitRadiusPx:120, compositeWidthPx:600 } },
-  { id:"bg_fashionable_001",   formKey:"fashionable",  category:"background", name:"패션 스튜디오",    price:40, asset:"/images/shop/backgrounds/bg_fashionable_001",    description:"패션형 전용 스튜디오 배경이에요." },
-  { id:"deco_fashionable_001", formKey:"fashionable",  category:"decoration", name:"드레스 행거",      price:20, asset:"/images/shop/decorations/deco_fashionable_001",  description:"예쁜 옷이 걸린 행거 장식이에요.",
-    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_fashionable_001_pet", allowedForms:["fashionable"],  hitRadiusPx:120, compositeWidthPx:600 } },
-  { id:"bg_gluttonous_001",    formKey:"gluttonous",   category:"background", name:"달콤한 과자 나라", price:40, asset:"/images/shop/backgrounds/bg_gluttonous_001",     description:"먹보형 전용 달콤한 과자 나라 배경이에요." },
-  { id:"deco_gluttonous_001",  formKey:"gluttonous",   category:"decoration", name:"배추 의자",        price:20, asset:"/images/shop/decorations/deco_gluttonous_001",   description:"먹보형 전용 아늑한 배추 의자예요.",
-    interaction: { enabled:true, type:"composite", compositeAsset:"/images/shop/interactions/deco_gluttonous_001_pet", allowedForms:["gluttonous"], hitRadiusPx:120, compositeWidthPx:600 } },
+  { id:"bg_energetic_001",     formKey:"energetic",    category:"background", name:"활기찬 놀이터",    price:40, asset:`${BASE}images/shop/backgrounds/bg_energetic_001`,     description:"장난꾸러기형 전용 활기찬 놀이터 배경이에요." },
+  { id:"deco_energetic_001",   formKey:"energetic",    category:"decoration", name:"장난감 바구니",    price:20, asset:`${BASE}images/shop/decorations/deco_energetic_001`,   description:"장난감이 가득한 바구니 장식이에요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:`${BASE}images/shop/interactions/deco_energetic_001_pet`,   allowedForms:["energetic"],    hitRadiusPx:120, compositeWidthPx:600 } },
+  { id:"bg_intelligent_001",   formKey:"intelligent",  category:"background", name:"별빛 서재",        price:40, asset:`${BASE}images/shop/backgrounds/bg_intelligent_001`,    description:"똑똑형 전용 별빛 서재 배경이에요." },
+  { id:"deco_intelligent_001", formKey:"intelligent",  category:"decoration", name:"책 탑",            price:20, asset:`${BASE}images/shop/decorations/deco_intelligent_001`,  description:"높이 쌓인 책 탑 장식이에요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:`${BASE}images/shop/interactions/deco_intelligent_001_pet`, allowedForms:["intelligent"],  hitRadiusPx:120, compositeWidthPx:600 } },
+  { id:"bg_affectionate_001",  formKey:"affectionate", category:"background", name:"포근한 침대방",    price:40, asset:`${BASE}images/shop/backgrounds/bg_affectionate_001`,   description:"포근형 전용 아늑한 방 배경이에요." },
+  { id:"deco_affectionate_001",formKey:"affectionate", category:"decoration", name:"하트 쿠션",        price:20, asset:`${BASE}images/shop/decorations/deco_affectionate_001`, description:"포근한 하트 쿠션 장식이에요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:`${BASE}images/shop/interactions/deco_affectionate_001_pet`,allowedForms:["affectionate"], hitRadiusPx:120, compositeWidthPx:600 } },
+  { id:"bg_lucky_001",         formKey:"lucky",        category:"background", name:"마법의 별숲",      price:40, asset:`${BASE}images/shop/backgrounds/bg_lucky_001`,          description:"신비형 전용 마법의 별숲 배경이에요." },
+  { id:"deco_lucky_001",       formKey:"lucky",        category:"decoration", name:"행운의 별",        price:20, asset:`${BASE}images/shop/decorations/deco_lucky_001`,        description:"빛나는 행운의 별 장식이에요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:`${BASE}images/shop/interactions/deco_lucky_001_pet`,       allowedForms:["lucky"],        hitRadiusPx:120, compositeWidthPx:600 } },
+  { id:"bg_fashionable_001",   formKey:"fashionable",  category:"background", name:"패션 스튜디오",    price:40, asset:`${BASE}images/shop/backgrounds/bg_fashionable_001`,    description:"패션형 전용 스튜디오 배경이에요." },
+  { id:"deco_fashionable_001", formKey:"fashionable",  category:"decoration", name:"드레스 행거",      price:20, asset:`${BASE}images/shop/decorations/deco_fashionable_001`,  description:"예쁜 옷이 걸린 행거 장식이에요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:`${BASE}images/shop/interactions/deco_fashionable_001_pet`, allowedForms:["fashionable"],  hitRadiusPx:120, compositeWidthPx:600 } },
+  { id:"bg_gluttonous_001",    formKey:"gluttonous",   category:"background", name:"달콤한 과자 나라", price:40, asset:`${BASE}images/shop/backgrounds/bg_gluttonous_001`,     description:"먹보형 전용 달콤한 과자 나라 배경이에요." },
+  { id:"deco_gluttonous_001",  formKey:"gluttonous",   category:"decoration", name:"배추 의자",        price:20, asset:`${BASE}images/shop/decorations/deco_gluttonous_001`,   description:"먹보형 전용 아늑한 배추 의자예요.",
+    interaction: { enabled:true, type:"composite", compositeAsset:`${BASE}images/shop/interactions/deco_gluttonous_001_pet`, allowedForms:["gluttonous"], hitRadiusPx:120, compositeWidthPx:600 } },
 ];
 
 const SHOP_MASTER = [
@@ -278,22 +283,22 @@ const SHOP_MASTER = [
     isDefault: true,
   },
   // 예시 (파일 추가 후 price/description 수정):
-  { id:"bg_001", name:"오로라 설산", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_001.png", description:"신비로운 우주 배경" },
-  { id:"bg_002", name:"크리스마스 배경", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_002.png", description:"크리스마스의 아늑한 배경" },
-  { id:"bg_003", name:"따듯한 집안", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_003.png", description:"따뜻한 집안 배경" },
-  { id:"bg_004", name:"해질녘 바다", category:"background", price:30, imagePath:"/images/shop/backgrounds/bg_004.png", description:"노을이 지는 바닷가 배경" },  
+  { id:"bg_001", name:"오로라 설산", category:"background", price:30, imagePath:`${BASE}images/shop/backgrounds/bg_001.png`, description:"신비로운 우주 배경" },
+  { id:"bg_002", name:"크리스마스 배경", category:"background", price:30, imagePath:`${BASE}images/shop/backgrounds/bg_002.png`, description:"크리스마스의 아늑한 배경" },
+  { id:"bg_003", name:"따듯한 집안", category:"background", price:30, imagePath:`${BASE}images/shop/backgrounds/bg_003.png`, description:"따뜻한 집안 배경" },
+  { id:"bg_004", name:"해질녘 바다", category:"background", price:30, imagePath:`${BASE}images/shop/backgrounds/bg_004.png`, description:"노을이 지는 바닷가 배경" },
 
   // ── decoration ───────────────────────────────────────────
   // 예시:
-  { id:"deco_001", name:"야옹 이글루", category:"decoration", price:15, imagePath:"/images/shop/decorations/deco_001.png", description:"밖은 서늘하지만 안쪽은 아늑한 야옹이 이글루에요." },
+  { id:"deco_001", name:"야옹 이글루", category:"decoration", price:15, imagePath:`${BASE}images/shop/decorations/deco_001.png`, description:"밖은 서늘하지만 안쪽은 아늑한 야옹이 이글루에요." },
 
   // ── window ───────────────────────────────────────────────
   // decoration과 동일하게 방에 배치되지만 벽(상단) 영역에만 놓인다.
   // weatherMask: 유리 모양 알파 마스크 PNG(창문 PNG와 같은 해상도). 불투명 영역만 하늘이 비침 → 곡선 창도 지원.
-  { id:"win_001", name:"동그란 창문", category:"window", price:10, imagePath:"/images/shop/windows/win_001.png", description:"벽에 다는 아늑한 동그란 창문이에요.",
-    weatherMask:"/images/shop/windows/win_001_mask.png" },
-  { id:"win_002", name:"하트 창문", category:"window", price:10, imagePath:"/images/shop/windows/win_002.png", description:"벽에 다는 하트 창문이에요.",
-    weatherMask:"/images/shop/windows/win_002_mask.png" },
+  { id:"win_001", name:"동그란 창문", category:"window", price:10, imagePath:`${BASE}images/shop/windows/win_001.png`, description:"벽에 다는 아늑한 동그란 창문이에요.",
+    weatherMask:`${BASE}images/shop/windows/win_001_mask.png` },
+  { id:"win_002", name:"하트 창문", category:"window", price:10, imagePath:`${BASE}images/shop/windows/win_002.png`, description:"벽에 다는 하트 창문이에요.",
+    weatherMask:`${BASE}images/shop/windows/win_002_mask.png` },
 
   // ── gift_item ── 뽑기 선물(GIFT_MASTER)을 파생 주입. 구매 즉시 inv.gifts에 인스턴스 추가(handleShopBuy).
   ...GIFT_SHOP_ITEMS,
@@ -357,7 +362,7 @@ const EVENT_REWARDS    = {
 const INITIAL_STATUS   = { hunger: 80, mood: 80, cleanness: 80 };
 const INITIAL_TICKETS  = 3;
 
-const MINIGAME_CONFIG  = { numMin: 2, numRange: 8, wrongCount: 3, wrongRange: 10, wrongOffset: 5, timerIcon: "/images/minigame/timer", timerIconSize: 44 };
+const MINIGAME_CONFIG  = { numMin: 2, numRange: 8, wrongCount: 3, wrongRange: 10, wrongOffset: 5, timerIcon: `${BASE}images/minigame/timer`, timerIconSize: 44 };
 
 // ===================================================
 // 유틸
@@ -451,11 +456,11 @@ const saveState = s => { try { localStorage.setItem("tama_v2",JSON.stringify(s))
 // ===================================================
 const CSS = `
 /* 폰트 self-host (CDN 의존 제거, 오프라인 보장 — P8 철학). public/fonts/ 의 woff2 사용 */
-@font-face{font-family:'Nunito';font-style:normal;font-weight:500;font-display:swap;src:url('/fonts/nunito-500.woff2') format('woff2');}
-@font-face{font-family:'Nunito';font-style:normal;font-weight:700;font-display:swap;src:url('/fonts/nunito-700.woff2') format('woff2');}
-@font-face{font-family:'Nunito';font-style:normal;font-weight:800;font-display:swap;src:url('/fonts/nunito-800.woff2') format('woff2');}
-@font-face{font-family:'Nunito';font-style:normal;font-weight:900;font-display:swap;src:url('/fonts/nunito-900.woff2') format('woff2');}
-@font-face{font-family:'Jua';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/jua-400.woff2') format('woff2');}
+@font-face{font-family:'Nunito';font-style:normal;font-weight:500;font-display:swap;src:url(${BASE}fonts/nunito-500.woff2) format('woff2');}
+@font-face{font-family:'Nunito';font-style:normal;font-weight:700;font-display:swap;src:url(${BASE}fonts/nunito-700.woff2) format('woff2');}
+@font-face{font-family:'Nunito';font-style:normal;font-weight:800;font-display:swap;src:url(${BASE}fonts/nunito-800.woff2) format('woff2');}
+@font-face{font-family:'Nunito';font-style:normal;font-weight:900;font-display:swap;src:url(${BASE}fonts/nunito-900.woff2) format('woff2');}
+@font-face{font-family:'Jua';font-style:normal;font-weight:400;font-display:swap;src:url(${BASE}fonts/jua-400.woff2) format('woff2');}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-content:center;align-items:center;min-height:100dvh;overflow:hidden;}
 .shell{width:min(100vw,420px);flex-shrink:0;height:100dvh;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
@@ -1009,18 +1014,18 @@ const PET_EMOTIONS = [
   { motion: "surprise", line: "꺄악!" },
 ];
 // 먹기 모션 때 펫 옆에 뜨는 밥 아이콘. imgs를 순서대로 시도(png→webp), 전부 실패 시 emoji 폴백.
-const FOOD_ICON = { imgs: ["/images/icons/food.png", "/images/icons/food.webp"], emoji: "🍚" };
+const FOOD_ICON = { imgs: [`${BASE}images/icons/food.png`, `${BASE}images/icons/food.webp`], emoji: "🍚" };
 
 // ── 펫 외형 순수 함수 (App의 getPet* 및 놀러가기 방문 렌더가 공유) ──
 function petDirOf(egg, pet) { return pet.stage===3&&pet.finalForm ? `stage3/${pet.finalForm}` : `${egg||"egg_red"}/stage${pet.stage}`; }
 function petEmojiOf(pet) { return pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.emoji||"✨" : pet.stage===2?"🐣":"🥚"; }
 function petNameOf(pet) { return pet.name || (pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm]?.name||`${pet.stage}단계` : `${pet.stage}단계`); }
-function petImgOf(egg, pet) { return `/images/pets/${petDirOf(egg,pet)}/static.png`; }
+function petImgOf(egg, pet) { return `${BASE}images/pets/${petDirOf(egg,pet)}/static.png`; }
 function petMotionOf(egg, pet) {
   const dir = petDirOf(egg, pet);
-  const m = { stand:`/images/pets/${dir}/stand.webp`, walk:`/images/pets/${dir}/walk.webp` };
-  PET_EMOTIONS.forEach(e => { m[e.motion] = `/images/pets/${dir}/${e.motion}.webp`; });
-  m.eat = `/images/pets/${dir}/eat.webp`;
+  const m = { stand:`${BASE}images/pets/${dir}/stand.webp`, walk:`${BASE}images/pets/${dir}/walk.webp` };
+  PET_EMOTIONS.forEach(e => { m[e.motion] = `${BASE}images/pets/${dir}/${e.motion}.webp`; });
+  m.eat = `${BASE}images/pets/${dir}/eat.webp`;
   return m;
 }
 function petColorOf(pet) { return pet.stage===3&&pet.finalForm ? FINAL_FORMS[pet.finalForm].color : "#88d8b0"; }
@@ -1313,7 +1318,7 @@ function EggSelect({ onSelect }) {
           <button key={e.id} onMouseEnter={()=>setHov(e.id)} onMouseLeave={()=>setHov(null)} onClick={()=>onSelect(e.id, trimmed)}
             style={{background:hov===e.id?e.color:CARD_BG,border:`2px solid ${hov===e.id?"rgba(0,0,0,.15)":CARD_BORDER}`,borderRadius:20,padding:"16px 8px",cursor:"pointer",transform:hov===e.id?"scale(1.06)":"scale(1)",transition:"all .2s",backdropFilter:"blur(8px)"}}>
             <div style={{display:"flex",justifyContent:"center",marginBottom:5}}>
-              <PetSprite size={38} emoji="🥚" imgSrc={`/images/pets/${e.id}/stage1/static.png`}/>
+              <PetSprite size={38} emoji="🥚" imgSrc={`${BASE}images/pets/${e.id}/stage1/static.png`}/>
             </div>
             <div style={{fontFamily:"'Jua',sans-serif",fontSize:12,color:INK,fontWeight:700}}>{e.label}</div>
             {hov===e.id&&<div style={{fontSize:10,color:"#555",marginTop:3}}>{e.hint}</div>}
@@ -2150,13 +2155,13 @@ function BottomBar({ daily, inv, onFeed, onPlay, onClean, onGiftNav, onNav }) {
 // img = 확장자 없는 베이스 경로. CLEAN_IMG_EXTS 순서로 시도 → 다 없으면 icon(이모지) 폴백. webp/png/jpg 무관.
 const CLEAN_IMG_EXTS = ["webp", "png", "jpg"];
 const CLEAN_TOOLS = [
-  { key:"foam",   icon:"🧽", label:"거품내기", img:"/images/clean/sponge" },
-  { key:"shower", icon:"🚿", label:"샤워",     img:"/images/clean/shower" },
-  { key:"brush",  icon:"🖌️", label:"빗질",     img:"/images/clean/brush" },
+  { key:"foam",   icon:"🧽", label:"거품내기", img:`${BASE}images/clean/sponge` },
+  { key:"shower", icon:"🚿", label:"샤워",     img:`${BASE}images/clean/shower` },
+  { key:"brush",  icon:"🖌️", label:"빗질",     img:`${BASE}images/clean/brush` },
 ];
 // 씻기 배경 — /images/clean/background.{webp,png,jpg} 있으면 사용, 없으면 그라데이션 폴백(CSS 다중 background).
 const CLEAN_BG_CSS = [
-  ...CLEAN_IMG_EXTS.map(ext => `url(/images/clean/background.${ext}) center/cover no-repeat`),
+  ...CLEAN_IMG_EXTS.map(ext => `url(${BASE}images/clean/background.${ext}) center/cover no-repeat`),
   "linear-gradient(180deg,#BFE6F5 0%,#D9F0FA 55%,#EAF7FC 100%)",
 ].join(", ");
 const CLEAN_TH = 1200;  // 도구별 완료 누적 드래그 px(조정 가능)
@@ -3921,7 +3926,7 @@ function EvoPopup({ data, egg, onConfirm }) {
       <div style={{background:is3?"rgba(8,6,20,.98)":"rgba(16,14,36,.96)",backdropFilter:"blur(20px)",borderRadius:32,padding:"38px 26px",width:"88%",maxWidth:360,textAlign:"center",border:`2px solid ${is3?"#FFD700":"rgba(255,255,255,.2)"}`,animation:is3?"glow 2s ease infinite, pop .5s ease":"pop .4s ease"}}>
         <div style={{fontSize:15,color:is3?"#FFD700":"rgba(255,255,255,.55)",marginBottom:6,fontWeight:700}}>{is3?"✨ 최종 진화!":"🎉 진화!"}</div>
         <div style={{marginBottom:14,animation:"float 2s ease-in-out infinite",display:"flex",justifyContent:"center"}}>
-          <PetSprite size={84} emoji={form?form.emoji:"🐣"} imgSrc={form?`/images/pets/stage3/${data.finalForm}/static.png`:`/images/pets/${egg||"egg_red"}/stage2/static.png`}/>
+          <PetSprite size={84} emoji={form?form.emoji:"🐣"} imgSrc={form?`${BASE}images/pets/stage3/${data.finalForm}/static.png`:`${BASE}images/pets/${egg||"egg_red"}/stage2/static.png`}/>
         </div>
         <h2 style={{fontFamily:"'Jua',sans-serif",fontSize:23,color:"#fff",marginBottom:5}}>{form?form.name:"성장체"}</h2>
         <p style={{color:"rgba(255,255,255,.55)",fontSize:13,marginBottom:is3?14:22}}>{is3?"드디어 최종 진화했어요!":"한 단계 더 성장했어요!"}</p>
