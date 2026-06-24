@@ -10,8 +10,11 @@ export default defineConfig({
     react(),
     ...(process.env.HTTPS ? [basicSsl()] : []),
     VitePWA({
-      registerType: 'autoUpdate',   // 새 빌드 시 SW 자동 갱신
-      injectRegister: 'auto',       // 등록 코드 자동 주입 (prod만, dev HMR 안전)
+      strategies: 'injectManifest', // 커스텀 SW(src/sw.js)에 precache 목록 주입
+      srcDir: 'src',
+      filename: 'sw.js',
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
       manifest: {
         name: '타마고치 키우기',
         short_name: '타마고치',
@@ -28,9 +31,8 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: {
-        // NFC 시나리오: 첫 접속 시 전체 리소스 precache → 이후 완전 오프라인 동작.
-        // png/jpg도 포함해야 미해금 배경·장식이 오프라인에서 로딩됨.
+      injectManifest: {
+        // NFC 시나리오: 첫 접속 시 전체 리소스 precache → 이후 완전 오프라인 동작
         globPatterns: ['**/*.{js,css,html,webp,woff2,png,jpg}'],
         globIgnores: ['**/node_modules/**', '**/sw.js', '**/workbox-*.js', '**/_originals/**'],
       },

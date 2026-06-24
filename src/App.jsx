@@ -467,7 +467,6 @@ body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-conten
 .shell{width:min(100vw,420px);flex-shrink:0;height:100dvh;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
 @media(min-width:480px){.shell{border-radius:36px;height:910px;max-height:910px;}}
 @keyframes bounce{0%,100%{transform:translateY(0);opacity:.6}50%{transform:translateY(-8px);opacity:1}}
-@keyframes swProgress{0%{width:0%}60%{width:75%}85%{width:87%}100%{width:90%}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
 @keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
@@ -513,16 +512,27 @@ export default function App() {
   const [devWeather, setDevWeather] = useState(null); // null = 실제 날씨 사용
   const newPetRef = useRef(false);  // "다른 펫 키우기" 진입 시 handleEggSelect가 inv·daily를 보존하도록 표시
   const [feedTick, setFeedTick] = useState(0);  // 밥 줄 때마다 증가 → 펫이 밥 먹는 연출 트리거
-  // dev는 SW 없으므로 즉시 ready. prod는 precache 완료(=SW active) 대기.
-  const [swReady,    setSwReady]    = useState(import.meta.env.DEV || !('serviceWorker' in navigator));
-  const [swComplete, setSwComplete] = useState(false); // true → 게이지 100% 후 화면 전환
+  // dev·SW 미지원·재방문(controller 존재) → 즉시 ready. 첫 방문만 로딩 화면 표시.
+  const [swReady,    setSwReady]    = useState(
+    import.meta.env.DEV || !('serviceWorker' in navigator) || !!navigator.serviceWorker.controller
+  );
+  const [swProgress, setSwProgress] = useState(0); // 0~100 실제 다운로드 진행률
 
   useEffect(() => {
     if (swReady) return;
-    navigator.serviceWorker.ready.then(() => {
-      setSwComplete(true);                          // 게이지 100%로 점프
-      setTimeout(() => setSwReady(true), 500);      // 500ms 후 게임 진입
-    });
+    const onMsg = ({ data }) => {
+      if (data?.type !== 'SW_PROGRESS') return;
+      const pct = Math.round((data.done / data.total) * 100);
+      setSwProgress(pct);
+      if (data.done >= data.total) setTimeout(() => setSwReady(true), 500);
+    };
+    navigator.serviceWorker.addEventListener('message', onMsg);
+    // 60초 후에도 메시지 없으면 강제 진입 (네트워크 오류 등 대비)
+    const fallback = setTimeout(() => setSwReady(true), 60000);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', onMsg);
+      clearTimeout(fallback);
+    };
   }, []);
 
   const weather = (import.meta.env.DEV && devWeather) ? devWeather : getWeather();
@@ -858,13 +868,11 @@ export default function App() {
         <div style={{fontFamily:"'Nunito',sans-serif",fontSize:13,color:"rgba(255,255,255,.85)",textAlign:"center",lineHeight:1.7}}>
           첫 실행 시 게임 리소스를 한 번만 다운로드합니다.<br/>Wi-Fi를 유지한 채로 잠시 기다려 주세요.
         </div>
-        <div style={{width:"70%",maxWidth:260,height:8,background:"rgba(255,255,255,.25)",borderRadius:8,overflow:"hidden",marginTop:16}}>
-          <div style={{
-            height:"100%",background:"rgba(255,255,255,.9)",borderRadius:8,
-            width: swComplete ? "100%" : undefined,
-            animation: swComplete ? "none" : "swProgress 30s ease-out forwards",
-            transition: swComplete ? "width 0.4s ease" : "none",
-          }}/>
+        <div style={{width:"70%",maxWidth:260,marginTop:16}}>
+          <div style={{width:"100%",height:8,background:"rgba(255,255,255,.25)",borderRadius:8,overflow:"hidden"}}>
+            <div style={{height:"100%",background:"rgba(255,255,255,.9)",borderRadius:8,width:`${swProgress}%`,transition:"width 0.3s ease"}}/>
+          </div>
+          <div style={{textAlign:"right",fontFamily:"'Nunito',sans-serif",fontSize:11,color:"rgba(255,255,255,.7)",marginTop:4}}>{swProgress}%</div>
         </div>
         <div style={{display:"flex",gap:8,marginTop:12}}>
           {[0,1,2].map(i=>(
