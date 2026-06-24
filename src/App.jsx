@@ -462,7 +462,8 @@ const CSS = `
 @font-face{font-family:'Nunito';font-style:normal;font-weight:900;font-display:swap;src:url(${BASE}fonts/nunito-900.woff2) format('woff2');}
 @font-face{font-family:'Jua';font-style:normal;font-weight:400;font-display:swap;src:url(${BASE}fonts/jua-400.woff2) format('woff2');}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-content:center;align-items:center;min-height:100dvh;overflow:hidden;}
+html{overflow:hidden;height:100%;}
+body{font-family:'Nunito',sans-serif;background:#111;display:flex;justify-content:center;align-items:center;height:100%;overflow:hidden;position:fixed;width:100%;touch-action:none;overscroll-behavior:none;}
 .shell{width:min(100vw,420px);flex-shrink:0;height:100dvh;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.7);}
 @media(min-width:480px){.shell{border-radius:36px;height:910px;max-height:910px;}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
@@ -3384,7 +3385,7 @@ async function deletePhoto(id) {
 
 function ARSocialScreen({ egg, pet, onBack }) {
   const videoRef = useRef(null), wrapRef = useRef(null), petImgRef = useRef(null);
-  const [camState, setCamState] = useState("loading");   // loading | on | denied
+  const [camState, setCamState] = useState("loading");   // loading | on | denied | permission_denied
   const [motionKey, setMotionKey] = useState("stand");
   const [menuOpen, setMenuOpen] = useState(false);
   const [tf, setTf] = useState({ x:0, y:0, s:1, r:0 });   // 펫 중심 x,y(px) / scale / rotation(deg)
@@ -3429,7 +3430,7 @@ function ARSocialScreen({ egg, pet, onBack }) {
       if (caps.zoom) setZoomVal(settings.zoom ?? caps.zoom.min);
       try { await track?.applyConstraints({ advanced:[{ focusMode:"continuous" }] }); } catch {}  // 자동초점 지원 기기만
       setCamState("on");
-    } catch (e) { console.warn("[AR] 카메라 시작 실패:", e); setCamState("denied"); }
+    } catch (e) { console.warn("[AR] 카메라 시작 실패:", e); setCamState(e.name === "NotAllowedError" ? "permission_denied" : "denied"); }
   };
   const setZoom  = (v) => { setZoomVal(v); try { trackRef.current?.applyConstraints({ advanced:[{ zoom:v }] }).catch(()=>{}); } catch {} };
   useEffect(() => { startCam("environment"); return () => { streamRef.current?.getTracks().forEach(t => t.stop()); }; }, []);
@@ -3576,9 +3577,11 @@ function ARSocialScreen({ egg, pet, onBack }) {
       <video ref={videoRef} playsInline muted autoPlay onClick={()=>setZoomOpen(false)} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",display:camState==="on"?"block":"none"}}/>
       {camState!=="on" && (
         <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,background:"linear-gradient(180deg,#90A4AE,#CFD8DC)",textAlign:"center",padding:24}}>
-          <div style={{fontSize:48}}>📷</div>
-          <p style={{color:"#37474F",fontSize:14,fontWeight:800,lineHeight:1.6}}>
-            {camState==="loading" ? "카메라를 켜는 중…" : "카메라를 사용할 수 없어요.\n권한을 허용했는지, HTTPS(또는 localhost)인지 확인해 주세요."}
+          <div style={{fontSize:48}}>{camState==="loading" ? "📷" : "🚫"}</div>
+          <p style={{color:"#37474F",fontSize:14,fontWeight:800,lineHeight:1.6,whiteSpace:"pre-line"}}>
+            {camState==="loading" && "카메라를 켜는 중…"}
+            {camState==="permission_denied" && "카메라 권한이 거부되었어요.\n아이폰: 설정 → Safari → 카메라 → 허용\n안드로이드: 설정 → 앱 → 브라우저 → 권한 → 카메라"}
+            {camState==="denied" && "카메라를 사용할 수 없어요.\nHTTPS 환경인지 확인해 주세요."}
           </p>
           <p style={{color:"#546E7A",fontSize:12}}>카메라 없이도 펫 배치·캡처는 가능해요(단색 배경).</p>
         </div>
