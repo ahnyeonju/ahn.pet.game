@@ -511,6 +511,8 @@ export default function App() {
   const [shopBubbleLocked, setShopBubbleLocked] = useState(false);
   const [devWeather, setDevWeather] = useState(null); // null = 실제 날씨 사용
   const newPetRef = useRef(false);  // "다른 펫 키우기" 진입 시 handleEggSelect가 inv·daily를 보존하도록 표시
+  const screenRef = useRef(screen);
+  const popupRef  = useRef(popup);
   const [feedTick, setFeedTick] = useState(0);  // 밥 줄 때마다 증가 → 펫이 밥 먹는 연출 트리거
   // dev·SW 미지원·재방문(controller 존재) → 즉시 ready. 첫 방문만 로딩 화면 표시.
   const [swReady,    setSwReady]    = useState(
@@ -533,6 +535,38 @@ export default function App() {
       navigator.serviceWorker.removeEventListener('message', onMsg);
       clearTimeout(fallback);
     };
+  }, []);
+
+  // ref를 최신 screen·popup 값으로 동기화
+  useEffect(() => { screenRef.current = screen; }, [screen]);
+  useEffect(() => { popupRef.current  = popup;  }, [popup]);
+
+  // 안드로이드 백버튼 → 서브화면 닫기 or 종료 확인
+  useEffect(() => {
+    history.pushState({ tama: true }, '');
+    const handler = () => {
+      const s = screenRef.current;
+      const p = popupRef.current;
+      if (p) {
+        // 팝업 열려있으면 닫기
+        setPopup(null);
+        history.pushState({ tama: true }, '');
+      } else if (s !== 'home' && s !== 'egg_select') {
+        // 서브 화면 → 홈으로
+        setScreen('home');
+        history.pushState({ tama: true }, '');
+      } else {
+        // 홈/알 선택 → 종료 확인
+        if (window.confirm('게임을 종료하겠습니까?')) {
+          window.close();               // PWA(홈 추가) 종료 시도
+          setTimeout(() => history.go(-(history.length)), 100); // 차단된 경우 대비
+        } else {
+          history.pushState({ tama: true }, '');
+        }
+      }
+    };
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
   }, []);
 
   const weather = (import.meta.env.DEV && devWeather) ? devWeather : getWeather();
