@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/ahn.pet.game/sw.js', { scope: '/ahn.pet.game/' })})}
