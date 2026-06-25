@@ -540,6 +540,15 @@ export default function App() {
   const [exitConfirm, setExitConfirm] = useState(false);
   const exitConfirmRef = useRef(false);
 
+  // PWA 홈 화면 추가 프롬프트 캡처
+  const deferredInstallRef = useRef(null);
+  const [canInstall, setCanInstall] = useState(false);
+  useEffect(() => {
+    const handler = (e) => { e.preventDefault(); deferredInstallRef.current = e; setCanInstall(true); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
   // ref를 최신 screen·popup·exitConfirm 값으로 동기화
   useEffect(() => { screenRef.current      = screen;      }, [screen]);
   useEffect(() => { popupRef.current       = popup;       }, [popup]);
@@ -976,7 +985,7 @@ export default function App() {
         {popup==="event"     && daily.event && <EventPopup event={daily.event} claimed={daily.eventRewardClaimed} onClaim={handleEventReward} onClose={()=>setPopup(null)}/>}
         {popup==="rainbow"   && <RainbowPopup onChoose={handleRainbow} onClose={()=>setPopup(null)}/>}
         {popup==="evolution" && evoData && <EvoPopup data={evoData} egg={egg} onConfirm={handleEvoConfirm}/>}
-        {popup==="settings"  && <SettingsPopup onClose={()=>setPopup(null)} onExport={handleExport} onImport={handleImport}/>}
+        {popup==="settings"  && <SettingsPopup onClose={()=>setPopup(null)} onExport={handleExport} onImport={handleImport} canInstall={canInstall} onInstall={async()=>{ const p=deferredInstallRef.current; if(!p) return; await p.prompt(); const r=await p.userChoice; if(r.outcome==='accepted'){ deferredInstallRef.current=null; setCanInstall(false); } }}/>}
         {popup==="formShopEvent" && pet.finalForm && <FormShopEventPopup form={FINAL_FORMS[pet.finalForm]} onConfirm={handleFormShopEvent} onClose={()=>setPopup(null)}/>}
         {shopBubbleLocked && <div style={{position:"absolute",inset:0,zIndex:8000}}/>}
         {popup==="devpanel" && import.meta.env.DEV && (
@@ -4222,11 +4231,12 @@ function FormShopEventPopup({ form, onConfirm, onClose }) {
 
 // 팝업: 설정 (세이브 코드 내보내기/불러오기)
 // ===================================================
-function SettingsPopup({ onClose, onExport, onImport }) {
+function SettingsPopup({ onClose, onExport, onImport, canInstall, onInstall }) {
   const [exportCode, setExportCode] = useState("");
   const [importCode, setImportCode] = useState("");
   const [error, setError]           = useState("");
   const [copied, setCopied]         = useState(false);
+  const [installConfirm, setInstallConfirm] = useState(false);
 
   const handleExport = () => setExportCode(onExport());
 
@@ -4248,6 +4258,29 @@ function SettingsPopup({ onClose, onExport, onImport }) {
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
           <h3 style={{fontFamily:"'Jua',sans-serif",fontSize:19,color:"#fff"}}>⚙️ 설정</h3>
           <button onClick={onClose} style={{background:"rgba(255,255,255,.12)",border:"none",borderRadius:14,padding:"5px 11px",color:"#fff",cursor:"pointer",fontWeight:700}}>✕</button>
+        </div>
+
+        {/* 홈 화면에 추가 */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.7)",marginBottom:8}}>📱 홈 화면에 추가</div>
+          {canInstall ? (
+            installConfirm ? (
+              <div style={{background:"rgba(255,255,255,.07)",borderRadius:16,padding:"14px 16px"}}>
+                <div style={{fontFamily:"'Jua',sans-serif",fontSize:15,color:"#fff",marginBottom:4}}>홈 화면에 추가하시겠어요?</div>
+                <div style={{fontSize:12,color:"rgba(255,255,255,.6)",marginBottom:14}}>오프라인에서도 앱처럼 실행됩니다.</div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>setInstallConfirm(false)} style={{flex:1,padding:"9px 0",borderRadius:12,border:"1px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.08)",fontFamily:"'Jua',sans-serif",fontSize:14,color:"rgba(255,255,255,.7)",cursor:"pointer"}}>취소</button>
+                  <button onClick={()=>{ setInstallConfirm(false); onInstall(); }} style={{flex:1,padding:"9px 0",borderRadius:12,border:"none",background:"linear-gradient(135deg,#43C6AC,#4ECDC4)",fontFamily:"'Jua',sans-serif",fontSize:14,color:"#fff",cursor:"pointer",fontWeight:800}}>확인</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={()=>setInstallConfirm(true)} style={{width:"100%",background:"linear-gradient(135deg,#43C6AC,#4ECDC4)",border:"none",borderRadius:14,padding:"10px",fontSize:13,fontWeight:800,color:"#fff",cursor:"pointer",fontFamily:"'Jua',sans-serif"}}>
+                홈 화면에 추가하기 ➕
+              </button>
+            )
+          ) : (
+            <div style={{fontSize:12,color:"rgba(255,255,255,.4)",padding:"10px 12px",background:"rgba(255,255,255,.05)",borderRadius:12}}>이미 설치되어 있거나 브라우저에서 직접 추가해 주세요.</div>
+          )}
         </div>
 
         {/* 내보내기 */}
