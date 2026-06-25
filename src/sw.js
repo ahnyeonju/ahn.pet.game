@@ -38,6 +38,21 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+
+  // 페이지 HTML(navigate)은 네트워크 우선 → 온라인이면 항상 최신, 오프라인이면 캐시 폴백
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(res => {
+          caches.open(CACHE).then(c => c.put(event.request, res.clone()));
+          return res;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // JS·CSS·이미지 등 해시 포함 자산은 캐시 우선 (오프라인 동작 보장)
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request))
   );
